@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as campaignDrafts from "../campaignDrafts.js";
 import type * as campaigns from "../campaigns.js";
 import type * as modules from "../modules.js";
 import type * as suppressions from "../suppressions.js";
@@ -20,6 +21,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  campaignDrafts: typeof campaignDrafts;
   campaigns: typeof campaigns;
   modules: typeof modules;
   suppressions: typeof suppressions;

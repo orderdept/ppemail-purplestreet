@@ -6,6 +6,7 @@ import {
   formatRate,
   getPurplePricesData,
 } from "../../lib/purple-prices-data";
+import { CampaignWorkspace } from "./campaign-workspace";
 import { ImportBouncesButton } from "./import-bounces-button";
 import { TemplateManager } from "./template-manager";
 
@@ -27,9 +28,10 @@ export default async function PurplePricesEmailPage() {
           <p className="eyebrow">Purplestreet / Purple Prices</p>
           <h1>Purple Prices Email</h1>
           <p className="lede">
-            Hosted control panel state for Purple Prices. This page now carries
-            over the real suppression list, the saved message template, and the
-            latest campaign record from the retired local panel.
+            Purple Prices is now living on PS in earnest. The hosted panel is
+            carrying the real suppression list, saved messages, campaign setup,
+            and the finished campaign history while we move the live sender
+            across piece by piece.
           </p>
         </div>
         <div className="status-pill">Hosted on PS</div>
@@ -61,6 +63,8 @@ export default async function PurplePricesEmailPage() {
           <strong>{compactNumber(data.suppressions.length)}</strong>
         </article>
       </section>
+
+      <CampaignWorkspace draft={data.draft} suppressions={data.suppressions} />
 
       <section className="content-grid">
         <article className="panel wide">

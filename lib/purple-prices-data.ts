@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { getConvexSuppressions, getConvexTemplates } from "./convex-server";
-import { type SavedTemplate } from "./purple-prices-types";
+import { getConvexCampaignDraft, getConvexSuppressions, getConvexTemplates } from "./convex-server";
+import { type CampaignDraft, type SavedTemplate } from "./purple-prices-types";
 
 type CampaignResult = {
   batch?: number;
@@ -63,13 +63,33 @@ function sortNewest<T extends { completedAt?: string | null; createdAt?: string 
   });
 }
 
+function draftFromCampaign(campaign: CampaignJob | null): CampaignDraft {
+  const intervalMs = campaign?.intervalMs || 334;
+  const inferredPerSecond = Math.max(1, Math.min(5, Math.round(1000 / intervalMs)));
+
+  return {
+    csvContacts: [],
+    typedContacts: [],
+    pasteText: "",
+    smtpHost: "smtp.qboxmail.com",
+    smtpPort: 465,
+    smtpSecurity: "ssl",
+    smtpUsername: campaign?.smtp?.username || "support@purpleprices.com",
+    fromName: campaign?.smtp?.fromName || "Purple Prices",
+    dailyLimit: campaign?.dailyLimit || 800,
+    perSecond: inferredPerSecond,
+    spacingMode: "rate",
+  };
+}
+
 export async function getPurplePricesData() {
-  const [fileSuppressions, fileTemplates, campaignSummary, liveSuppressions, liveTemplates] = await Promise.all([
+  const [fileSuppressions, fileTemplates, campaignSummary, liveSuppressions, liveTemplates, liveDraft] = await Promise.all([
     readJson<string[]>("suppressions.json"),
     readJson<SavedTemplate[]>("templates.json"),
     readJson<CampaignSummary>("campaign-summary.json"),
     getConvexSuppressions(),
     getConvexTemplates(),
+    getConvexCampaignDraft(),
   ]);
   const suppressions =
     liveSuppressions && liveSuppressions.length > 0
@@ -80,6 +100,7 @@ export async function getPurplePricesData() {
   const latestTemplate = sortNewest(templates as Array<SavedTemplate & { createdAt?: string }>)[0] || null;
   const recentLog = [...(latestCampaign?.recentLog || [])].reverse();
   const recentFailures = [...(latestCampaign?.recentFailures || [])].reverse();
+  const draft = liveDraft || draftFromCampaign(latestCampaign);
 
   return {
     moduleKey,
@@ -90,6 +111,7 @@ export async function getPurplePricesData() {
     senderName: latestCampaign?.smtp?.fromName || "Purple Prices",
     latestCampaign,
     latestTemplate,
+    draft,
     suppressions,
     templates,
     campaigns: campaignSummary.campaignHistory || [],

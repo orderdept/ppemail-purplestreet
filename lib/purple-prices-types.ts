@@ -5,6 +5,26 @@ export type CampaignMessage = {
   subject: string;
 };
 
+export type CampaignContact = {
+  email: string;
+  name: string;
+};
+
+export type CampaignDraft = {
+  csvContacts: CampaignContact[];
+  typedContacts: CampaignContact[];
+  pasteText: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: "ssl" | "starttls";
+  smtpUsername: string;
+  fromName: string;
+  dailyLimit: number;
+  perSecond: number;
+  spacingMode: "rate" | "daily";
+  updatedAt?: string;
+};
+
 export type SavedTemplate = {
   id: string;
   name: string;

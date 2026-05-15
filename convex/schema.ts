@@ -2,6 +2,32 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  campaignDrafts: defineTable({
+    moduleKey: v.string(),
+    csvContacts: v.array(
+      v.object({
+        email: v.string(),
+        name: v.string(),
+      }),
+    ),
+    typedContacts: v.array(
+      v.object({
+        email: v.string(),
+        name: v.string(),
+      }),
+    ),
+    pasteText: v.string(),
+    smtpHost: v.string(),
+    smtpPort: v.number(),
+    smtpSecurity: v.union(v.literal("ssl"), v.literal("starttls")),
+    smtpUsername: v.string(),
+    fromName: v.string(),
+    dailyLimit: v.number(),
+    perSecond: v.number(),
+    spacingMode: v.union(v.literal("rate"), v.literal("daily")),
+    updatedAt: v.string(),
+  }).index("by_module", ["moduleKey"]),
+
   campaigns: defineTable({
     moduleKey: v.string(),
     status: v.union(

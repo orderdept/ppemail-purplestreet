@@ -1,7 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 
 import { api } from "../convex/_generated/api";
-import { type CampaignMessage, type SavedTemplate } from "./purple-prices-types";
+import { type CampaignDraft, type CampaignMessage, type SavedTemplate } from "./purple-prices-types";
 
 export const moduleKey = "purple-prices-email";
 
@@ -61,6 +61,31 @@ export async function getConvexTemplates() {
   }));
 }
 
+export async function getConvexCampaignDraft() {
+  const client = getConvexClient();
+  if (!client) {
+    return null;
+  }
+  const row = await client.query(api.campaignDrafts.getByModule, { moduleKey });
+  if (!row) {
+    return null;
+  }
+  return {
+    csvContacts: row.csvContacts,
+    typedContacts: row.typedContacts,
+    pasteText: row.pasteText,
+    smtpHost: row.smtpHost,
+    smtpPort: row.smtpPort,
+    smtpSecurity: row.smtpSecurity,
+    smtpUsername: row.smtpUsername,
+    fromName: row.fromName,
+    dailyLimit: row.dailyLimit,
+    perSecond: row.perSecond,
+    spacingMode: row.spacingMode,
+    updatedAt: row.updatedAt,
+  } satisfies CampaignDraft;
+}
+
 export async function upsertConvexTemplate(name: string, message: CampaignMessage) {
   const client = getConvexClient();
   if (!client) {
@@ -81,5 +106,27 @@ export async function deleteConvexTemplate(name: string) {
   return await client.mutation(api.templates.deleteForModule, {
     moduleKey,
     name,
+  });
+}
+
+export async function upsertConvexCampaignDraft(draft: CampaignDraft) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.campaignDrafts.upsertForModule, {
+    moduleKey,
+    csvContacts: draft.csvContacts,
+    typedContacts: draft.typedContacts,
+    pasteText: draft.pasteText,
+    smtpHost: draft.smtpHost,
+    smtpPort: draft.smtpPort,
+    smtpSecurity: draft.smtpSecurity,
+    smtpUsername: draft.smtpUsername,
+    fromName: draft.fromName,
+    dailyLimit: draft.dailyLimit,
+    perSecond: draft.perSecond,
+    spacingMode: draft.spacingMode,
+    updatedAt: draft.updatedAt || new Date().toISOString(),
   });
 }

@@ -120,6 +120,10 @@ code {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
+.stat-grid-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .stat-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -352,6 +356,40 @@ code {
   line-height: 1.5;
   margin: 10px 0 0;
   max-width: 32rem;
+}
+
+.top-gap {
+  margin-top: 16px;
+}
+
+.status-chip {
+  background: #f5edf8;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
+.status-chip.ready {
+  background: #eef9f1;
+  border-color: #cde9d4;
+  color: #23673a;
+}
+
+.status-chip.duplicate {
+  background: #fff6e8;
+  border-color: #f0ddaf;
+  color: #8a5f13;
+}
+
+.status-chip.suppressed {
+  background: #fcedf0;
+  border-color: #efc9d2;
+  color: #9a3150;
 }
 
 .error-text {
