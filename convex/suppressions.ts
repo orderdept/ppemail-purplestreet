@@ -62,3 +62,38 @@ export const replaceForModule = mutation({
     };
   },
 });
+
+export const addForModule = mutation({
+  args: {
+    moduleKey: v.string(),
+    email: v.string(),
+    source: v.union(
+      v.literal("manual"),
+      v.literal("bounce"),
+      v.literal("unsubscribe"),
+      v.literal("import"),
+    ),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("suppressions")
+      .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
+      .collect();
+
+    const alreadyThere = existing.find((row) => row.email === args.email);
+    if (alreadyThere) {
+      return { added: false, count: existing.length };
+    }
+
+    await ctx.db.insert("suppressions", {
+      moduleKey: args.moduleKey,
+      email: args.email,
+      source: args.source,
+      note: args.note,
+      createdAt: new Date().toISOString(),
+    });
+
+    return { added: true, count: existing.length + 1 };
+  },
+});

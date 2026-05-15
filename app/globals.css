@@ -263,6 +263,26 @@ code {
   margin-top: 14px;
 }
 
+.inline-form {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.inline-input {
+  appearance: none;
+  background: #faf6fb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  flex: 1 1 220px;
+  font: inherit;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
 .host-template-bar {
   display: grid;
   gap: 16px;

@@ -42,6 +42,23 @@ export async function replaceConvexSuppressions(
   });
 }
 
+export async function addConvexSuppression(
+  email: string,
+  source: SuppressionSource = "manual",
+  note?: string,
+) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.suppressions.addForModule, {
+    moduleKey,
+    email,
+    source,
+    note,
+  });
+}
+
 export async function getConvexTemplates() {
   const client = getConvexClient();
   if (!client) {
