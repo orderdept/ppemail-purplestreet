@@ -7,6 +7,7 @@ import {
   getPurplePricesData,
 } from "../../lib/purple-prices-data";
 import { ImportBouncesButton } from "./import-bounces-button";
+import { TemplateManager } from "./template-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -106,27 +107,6 @@ export default async function PurplePricesEmailPage() {
         </article>
 
         <article className="panel">
-          <h2>Saved message</h2>
-          <p>{template?.name || "No saved message found."}</p>
-          <div className="meta-stack">
-            <div>
-              <span>Subject</span>
-              <strong>{template?.message.subject || "—"}</strong>
-            </div>
-            <div>
-              <span>Inbox snippet</span>
-              <strong>{template?.message.previewText || "—"}</strong>
-            </div>
-            <div>
-              <span>Footer address</span>
-              <strong className="multiline">
-                {template?.message.mailingAddress || "—"}
-              </strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="panel">
           <h2>Suppression list</h2>
           <p>{compactNumber(data.suppressions.length)} addresses carried over.</p>
           <div className="button-row">
@@ -149,10 +129,10 @@ export default async function PurplePricesEmailPage() {
           </div>
         </article>
 
-        <article className="panel wide">
-          <h2>Message body</h2>
-          <pre className="message-block">{template?.message.body || "—"}</pre>
-        </article>
+        <TemplateManager
+          initialTemplate={template}
+          templates={data.templates}
+        />
 
         <article className="panel">
           <h2>Recent failed deliveries</h2>

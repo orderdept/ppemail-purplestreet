@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { getConvexSuppressions } from "./convex-server";
+import { getConvexSuppressions, getConvexTemplates } from "./convex-server";
+import { type SavedTemplate } from "./purple-prices-types";
 
 type CampaignResult = {
   batch?: number;
@@ -10,13 +11,6 @@ type CampaignResult = {
   name?: string;
   recordedAt?: string;
   status: "sent" | "failed";
-};
-
-type CampaignMessage = {
-  body: string;
-  mailingAddress: string;
-  previewText: string;
-  subject: string;
 };
 
 type CampaignJob = {
@@ -52,13 +46,6 @@ type CampaignSummary = {
   >;
 };
 
-type SavedTemplate = {
-  id: string;
-  name: string;
-  updatedAt: string;
-  message: CampaignMessage;
-};
-
 const moduleKey = "purple-prices-email";
 const dataRoot = path.join(process.cwd(), "data", "purple-prices");
 
@@ -77,16 +64,18 @@ function sortNewest<T extends { completedAt?: string | null; createdAt?: string 
 }
 
 export async function getPurplePricesData() {
-  const [fileSuppressions, templates, campaignSummary, liveSuppressions] = await Promise.all([
+  const [fileSuppressions, fileTemplates, campaignSummary, liveSuppressions, liveTemplates] = await Promise.all([
     readJson<string[]>("suppressions.json"),
     readJson<SavedTemplate[]>("templates.json"),
     readJson<CampaignSummary>("campaign-summary.json"),
     getConvexSuppressions(),
+    getConvexTemplates(),
   ]);
   const suppressions =
     liveSuppressions && liveSuppressions.length > 0
       ? liveSuppressions.map((row) => row.email).sort((left, right) => left.localeCompare(right))
       : fileSuppressions;
+  const templates = liveTemplates && liveTemplates.length > 0 ? liveTemplates : fileTemplates;
   const latestCampaign = campaignSummary.latestCampaign || null;
   const latestTemplate = sortNewest(templates as Array<SavedTemplate & { createdAt?: string }>)[0] || null;
   const recentLog = [...(latestCampaign?.recentLog || [])].reverse();
