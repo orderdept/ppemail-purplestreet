@@ -6,9 +6,12 @@ import { runPurplePricesBounceImport } from "../../../../lib/purple-prices-impor
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const result = await runPurplePricesBounceImport();
+    const payload = await request.json().catch(() => ({}));
+    const result = await runPurplePricesBounceImport(
+      typeof payload?.campaignSubject === "string" ? payload.campaignSubject : "",
+    );
     revalidatePath("/");
     revalidatePath("/purple-prices-email");
     return NextResponse.json(result);

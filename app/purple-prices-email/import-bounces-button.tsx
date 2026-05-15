@@ -5,6 +5,7 @@ import { useState } from "react";
 
 type ImportResult = {
   suppressionCount: number;
+  campaignSubject: string;
   bounceCount: number;
   delayedCount: number;
   unsubscribeCount: number;
@@ -13,7 +14,7 @@ type ImportResult = {
   movedUnsubCount: number;
 };
 
-export function ImportBouncesButton() {
+export function ImportBouncesButton({ campaignSubject = "" }: { campaignSubject?: string }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [suppressionEmail, setSuppressionEmail] = useState("");
@@ -28,13 +29,15 @@ export function ImportBouncesButton() {
     try {
       const response = await fetch("/api/purple-prices/import-bounces", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignSubject }),
       });
       const data = (await response.json()) as ImportResult & { error?: string };
       if (!response.ok) {
         throw new Error(data.error || "Import Bounces could not finish.");
       }
       setMessage(
-        `Imported ${data.bounceCount} bounced addresses, ${data.unsubscribeCount} unsubscribe replies, and moved ${data.movedCount} bounced, ${data.movedDelayedCount} delayed, and ${data.movedUnsubCount} unsubscribe inbox notices.`,
+        `Imported ${data.bounceCount} bounced addresses for "${data.campaignSubject || campaignSubject}", ${data.unsubscribeCount} unsubscribe replies, and moved ${data.movedCount} bounced, ${data.movedDelayedCount} delayed, and ${data.movedUnsubCount} unsubscribe inbox notices.`,
       );
       router.refresh();
     } catch (error) {
@@ -104,7 +107,7 @@ export function ImportBouncesButton() {
         </button>
       </div>
       <p className={`inline-status ${isError ? "error-text" : ""}`}>
-        {message || "Scans the inbox, files bounce notices, updates live suppressions, and lets you add one-offs by hand."}
+        {message || `Scans the inbox for notices tied to "${campaignSubject || "the current campaign"}", files them, updates live suppressions, and lets you add one-offs by hand.`}
       </p>
     </div>
   );

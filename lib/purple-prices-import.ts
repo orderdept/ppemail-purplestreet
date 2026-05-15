@@ -49,6 +49,12 @@ function classifyNoticeSubject(subject: string) {
   return "";
 }
 
+function campaignSubjectMatchesNotice(rawMessage: string, campaignSubject?: string) {
+  const value = String(campaignSubject || "").trim().toLowerCase();
+  if (!value) return true;
+  return String(rawMessage || "").toLowerCase().includes(value);
+}
+
 function candidateEmails(value: string) {
   const matches = String(value || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
   return matches.map(normalizeEmail).filter(Boolean);
@@ -309,7 +315,7 @@ async function mergedSuppressionMap() {
   return map;
 }
 
-export async function runPurplePricesBounceImport() {
+export async function runPurplePricesBounceImport(campaignSubject?: string) {
   const suppressions = await mergedSuppressionMap();
   const client = new SimpleImapClient();
   let bounceCount = 0;
@@ -339,6 +345,12 @@ export async function runPurplePricesBounceImport() {
       const subject = headerValue(rawHeaders || rawMessage, "Subject");
       const folderName = classifyNoticeSubject(subject);
       if (!folderName) continue;
+      if (
+        (folderName === BOUNCED_FOLDER || folderName === DELAYED_FOLDER) &&
+        !campaignSubjectMatchesNotice(rawMessage, campaignSubject)
+      ) {
+        continue;
+      }
 
       buckets[folderName].push(uid);
 
@@ -390,6 +402,7 @@ export async function runPurplePricesBounceImport() {
 
     return {
       suppressionCount: suppressionItems.length,
+      campaignSubject: String(campaignSubject || ""),
       bounceCount,
       delayedCount,
       unsubscribeCount,

@@ -118,7 +118,7 @@ export default async function PurplePricesEmailPage() {
           <h2>Suppression list</h2>
           <p>{compactNumber(data.suppressions.length)} addresses carried over.</p>
           <div className="button-row">
-            <ImportBouncesButton />
+            <ImportBouncesButton campaignSubject={campaign?.subject || template?.message.subject || ""} />
           </div>
           <div className="button-row">
             <a className="action-link" href="/api/purple-prices/suppressions/export.csv">
