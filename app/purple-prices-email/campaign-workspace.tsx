@@ -3,10 +3,12 @@
 import { useMemo, useRef, useState } from "react";
 
 import { type CampaignContact, type CampaignDraft } from "../../lib/purple-prices-types";
+import { HostedSendActions } from "./hosted-send-actions";
 
 type Props = {
   draft: CampaignDraft;
   suppressions: string[];
+  templateName?: string | null;
 };
 
 type DraftContact = CampaignContact & {
@@ -128,7 +130,7 @@ function formatDraftCompletion(readyCount: number, spacing: number) {
   return new Date(Date.now() + Math.max(0, readyCount - 1) * spacing).toLocaleString();
 }
 
-export function CampaignWorkspace({ draft: initialDraft, suppressions }: Props) {
+export function CampaignWorkspace({ draft: initialDraft, suppressions, templateName }: Props) {
   const [draft, setDraft] = useState<CampaignDraft>(initialDraft);
   const [csvContacts, setCsvContacts] = useState<CampaignContact[]>(initialDraft.csvContacts);
   const [typedContacts, setTypedContacts] = useState<CampaignContact[]>(initialDraft.typedContacts);
@@ -422,11 +424,12 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions }: Props) 
             </div>
             <div>
               <span>Hosted send actions</span>
-              <strong>Next cutover step</strong>
+              <strong>Live test ready</strong>
             </div>
           </div>
-          <p className="top-gap">
-            PS now holds the real list and sending defaults. The live send buttons and hosted scheduler are the next slice, so we do not accidentally half-cut over the mailer.
+          <HostedSendActions templateName={templateName} />
+          <p>
+            PS now has the hosted mail login check and hosted test send. The next slice is turning that same mail layer into the real campaign queue and scheduler.
           </p>
         </article>
       </section>
