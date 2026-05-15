@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { getConvexSuppressions } from "./convex-server";
+
 type CampaignResult = {
   batch?: number;
   email: string;
@@ -75,11 +77,16 @@ function sortNewest<T extends { completedAt?: string | null; createdAt?: string 
 }
 
 export async function getPurplePricesData() {
-  const [suppressions, templates, campaignSummary] = await Promise.all([
+  const [fileSuppressions, templates, campaignSummary, liveSuppressions] = await Promise.all([
     readJson<string[]>("suppressions.json"),
     readJson<SavedTemplate[]>("templates.json"),
     readJson<CampaignSummary>("campaign-summary.json"),
+    getConvexSuppressions(),
   ]);
+  const suppressions =
+    liveSuppressions && liveSuppressions.length > 0
+      ? liveSuppressions.map((row) => row.email).sort((left, right) => left.localeCompare(right))
+      : fileSuppressions;
   const latestCampaign = campaignSummary.latestCampaign || null;
   const latestTemplate = sortNewest(templates as Array<SavedTemplate & { createdAt?: string }>)[0] || null;
   const recentLog = [...(latestCampaign?.recentLog || [])].reverse();

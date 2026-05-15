@@ -241,6 +241,44 @@ code {
   margin-top: 14px;
 }
 
+.live-action-stack {
+  min-width: 0;
+}
+
+.action-button {
+  align-items: center;
+  appearance: none;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.action-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.inline-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 10px 0 0;
+  max-width: 32rem;
+}
+
+.error-text {
+  color: #a22b3f;
+}
+
 .pill-list {
   display: flex;
   flex-wrap: wrap;

@@ -6,6 +6,8 @@ import {
   getPurplePricesData,
 } from "../lib/purple-prices-data";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const data = await getPurplePricesData();
   const latestCampaign = data.latestCampaign;

@@ -6,6 +6,9 @@ import {
   formatRate,
   getPurplePricesData,
 } from "../../lib/purple-prices-data";
+import { ImportBouncesButton } from "./import-bounces-button";
+
+export const dynamic = "force-dynamic";
 
 export default async function PurplePricesEmailPage() {
   const data = await getPurplePricesData();
@@ -127,10 +130,13 @@ export default async function PurplePricesEmailPage() {
           <h2>Suppression list</h2>
           <p>{compactNumber(data.suppressions.length)} addresses carried over.</p>
           <div className="button-row">
-            <a className="action-link" href={data.suppressionDownloads.csv}>
+            <ImportBouncesButton />
+          </div>
+          <div className="button-row">
+            <a className="action-link" href="/api/purple-prices/suppressions/export.csv">
               Download CSV
             </a>
-            <a className="action-link ghost" href={data.suppressionDownloads.json}>
+            <a className="action-link ghost" href="/api/purple-prices/suppressions/export.json">
               Download JSON
             </a>
           </div>
