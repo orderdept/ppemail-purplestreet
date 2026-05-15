@@ -98,3 +98,16 @@ await writeFile(
   "utf8",
 );
 console.log("Synced campaign-summary.json");
+
+const latestContacts = latest?.contacts || [];
+const campaignRecipients = {
+  campaignId: latest?.id || null,
+  subject: latest?.message?.subject || "",
+  emails: [...new Set(latestContacts.map((row) => String(row.email || "").trim().toLowerCase()).filter(Boolean))].sort(),
+};
+await writeFile(
+  path.join(targetDataRoot, "campaign-recipients.json"),
+  `${JSON.stringify(campaignRecipients, null, 2)}\n`,
+  "utf8",
+);
+console.log("Synced campaign-recipients.json");

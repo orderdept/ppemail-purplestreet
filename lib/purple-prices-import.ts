@@ -27,6 +27,24 @@ function currentDataRoot() {
   return path.join(process.cwd(), "data", "purple-prices");
 }
 
+async function readCampaignRecipients() {
+  try {
+    const raw = await readFile(path.join(currentDataRoot(), "campaign-recipients.json"), "utf8");
+    const data = JSON.parse(raw) as { campaignId?: string | null; subject?: string; emails?: string[] };
+    return {
+      campaignId: data.campaignId || null,
+      subject: String(data.subject || ""),
+      emails: new Set((data.emails || []).map(normalizeEmail).filter(Boolean)),
+    };
+  } catch {
+    return {
+      campaignId: null,
+      subject: "",
+      emails: new Set<string>(),
+    };
+  }
+}
+
 function normalizeEmail(value: string) {
   const trimmed = String(value || "").trim().toLowerCase();
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed) ? trimmed : "";
@@ -52,7 +70,20 @@ function classifyNoticeSubject(subject: string) {
 function campaignSubjectMatchesNotice(rawMessage: string, campaignSubject?: string) {
   const value = String(campaignSubject || "").trim().toLowerCase();
   if (!value) return true;
-  return String(rawMessage || "").toLowerCase().includes(value);
+  const originalSubject = extractOriginalMessageSubject(rawMessage);
+  return originalSubject ? originalSubject.toLowerCase() === value : false;
+}
+
+function extractOriginalMessageSubject(rawMessage: string) {
+  const text = String(rawMessage || "");
+  const returnedMailSubject = text.match(/returned mail with subject:\s*(.+)$/im)?.[1]?.trim();
+  if (returnedMailSubject) return returnedMailSubject;
+  const originalSubject = text.match(/^Original-Subject:\s*(.+)$/im)?.[1]?.trim();
+  if (originalSubject) return originalSubject;
+  const subjectLines = [...text.matchAll(/^Subject:\s*(.+)$/gim)]
+    .map((match) => String(match[1] || "").trim())
+    .filter(Boolean);
+  return subjectLines[1] || "";
 }
 
 function candidateEmails(value: string) {
@@ -317,6 +348,7 @@ async function mergedSuppressionMap() {
 
 export async function runPurplePricesBounceImport(campaignSubject?: string) {
   const suppressions = await mergedSuppressionMap();
+  const campaignRecipients = await readCampaignRecipients();
   const client = new SimpleImapClient();
   let bounceCount = 0;
   let delayedCount = 0;
@@ -352,21 +384,35 @@ export async function runPurplePricesBounceImport(campaignSubject?: string) {
         continue;
       }
 
-      buckets[folderName].push(uid);
-
       if (folderName === BOUNCED_FOLDER) {
         const recipients = extractFailedRecipients(rawMessage);
-        for (const email of recipients) {
+        const campaignOnlyRecipients = campaignRecipients.emails.size
+          ? recipients.filter((email) => campaignRecipients.emails.has(email))
+          : recipients;
+        if (!campaignOnlyRecipients.length) {
+          continue;
+        }
+        buckets[folderName].push(uid);
+        for (const email of campaignOnlyRecipients) {
           suppressions.set(email, { email, source: "bounce" });
         }
-        bounceCount += recipients.length;
+        bounceCount += campaignOnlyRecipients.length;
       }
 
       if (folderName === DELAYED_FOLDER) {
+        const recipients = extractFailedRecipients(rawMessage);
+        const campaignOnlyRecipients = campaignRecipients.emails.size
+          ? recipients.filter((email) => campaignRecipients.emails.has(email))
+          : recipients;
+        if (!campaignOnlyRecipients.length) {
+          continue;
+        }
+        buckets[folderName].push(uid);
         delayedCount += 1;
       }
 
       if (folderName === UNSUB_FOLDER) {
+        buckets[folderName].push(uid);
         const email =
           firstEmailInText(headerValue(rawHeaders || rawMessage, "Reply-To")) ||
           firstEmailInText(headerValue(rawHeaders || rawMessage, "From")) ||
