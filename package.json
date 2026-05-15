@@ -1,0 +1,18 @@
+{
+  "name": "ppemail-purplestreet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hosted Purple Prices email control panel for ppemail.purplestreet.com",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "convex": "^1.25.4",
+    "next": "^15.5.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}
