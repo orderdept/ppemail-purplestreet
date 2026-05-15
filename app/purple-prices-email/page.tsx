@@ -25,7 +25,7 @@ export default function PurplePricesEmailPage() {
             is rebuilt and approved.
           </p>
         </div>
-        <div className="status-pill">Cloudflare Access planned</div>
+        <div className="status-pill">Opened from Purplestreet</div>
       </div>
 
       <section className="stat-grid">

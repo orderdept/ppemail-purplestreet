@@ -4,22 +4,22 @@ export default function HomePage() {
       <div className="page-top">
         <div>
           <p className="eyebrow">Purple Street Control Panel</p>
-          <h1>PP Email</h1>
+          <h1>Purplestreet</h1>
           <p className="lede">
-            Hosted rebuild in progress for the Purple Prices email control
-            panel. This project is being migrated separately so the live local
-            sender can continue running without interference.
+            Private home for your hosted control panels. The Purple Prices
+            email panel is the first module, and the live local sender stays
+            separate while the hosted version is rebuilt.
           </p>
         </div>
-        <div className="status-pill">Separate hosted repo</div>
+        <div className="status-pill">Cloudflare Access protected</div>
       </div>
 
       <section className="content-grid">
         <article className="panel wide">
           <h2>First module</h2>
           <p>
-            Purple Prices email will be the first hosted control panel under
-            the `purplestreet.com` private admin domain system.
+            Purple Prices email is the first hosted control panel inside the
+            `purplestreet.com` private admin system.
           </p>
           <a className="panel-link" href="/purple-prices-email">
             Open Purple Prices Email
@@ -27,15 +27,15 @@ export default function HomePage() {
         </article>
 
         <article className="panel">
-          <h2>Hostname</h2>
-          <p>`ppemail.purplestreet.com`</p>
-          <p>Purple Prices identity remains on `purpleprices.com`.</p>
+          <h2>Panel identity</h2>
+          <p>Purple Prices mail stays on `purpleprices.com`.</p>
+          <p>This site is only the private control surface.</p>
         </article>
 
         <article className="panel">
           <h2>Access model</h2>
-          <p>Cloudflare Access in front of the app.</p>
-          <p>No app-managed password system required in v1.</p>
+          <p>Login happens at `purplestreet.com`.</p>
+          <p>Cloudflare Access handles the front door.</p>
         </article>
       </section>
     </main>
