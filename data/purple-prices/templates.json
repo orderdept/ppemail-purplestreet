@@ -1,0 +1,13 @@
+[
+  {
+    "id": "601c5f27",
+    "message": {
+      "body": "Hi {{name}},\n\nI wanted to let you know that we\u2019ve added new weight loss peptide offerings to our store, including Semaglutide, Tirzepatide, and Retatrutide.\n\nThese are available in 10mg lyophilized vials with bacteriostatic water included. As always, we encourage everyone to do their own research.\n\nPlease visit our website store for pricing and purchase (keyword \"GLP\" in the store).\n\nI have put together a little more info at this page:\n\nhttps://purple-peptides.vercel.app/\n\nThanks!\nDan\npurpleprices.com",
+      "mailingAddress": "Purple Prices\nPO Box 12172\nTempe AZ 85284",
+      "previewText": "Weight loss peptides now available...",
+      "subject": "Purple Prices Weight Loss Offering"
+    },
+    "name": "Weight Loss Offerings",
+    "updatedAt": "2026-05-14T00:29:39.513206+00:00"
+  }
+]
