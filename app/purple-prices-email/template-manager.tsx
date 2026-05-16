@@ -142,7 +142,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
     <article className="panel wide">
       <div className="section-head host-section-head">
         <div>
-          <p className="section-step">Step 4</p>
+          <p className="section-step">Step 1</p>
           <h2>Shape the message</h2>
           <p>Keep reusable campaign copy here so subject, preview text, body, and footer stay in sync.</p>
         </div>

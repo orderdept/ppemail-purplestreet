@@ -226,7 +226,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
       <article className="panel wide">
         <div className="section-head">
           <div>
-            <p className="section-step">Step 1</p>
+            <p className="section-step">Step 2</p>
             <h2>Build the audience</h2>
             <p>Upload a CSV, paste addresses, or combine both. The list is cleaned as it comes in so you can see what is truly ready.</p>
           </div>
@@ -311,7 +311,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
         <article className="panel">
           <div className="section-head">
             <div>
-              <p className="section-step">Step 2</p>
+              <p className="section-step">Step 3</p>
               <h2>Set delivery rules</h2>
               <p>Keep the sender identity, pacing, and cap aligned with how Purple Prices should send.</p>
             </div>
@@ -410,7 +410,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
         <article className="panel">
           <div className="section-head">
             <div>
-              <p className="section-step">Step 3</p>
+              <p className="section-step">Step 4</p>
               <h2>Run a final check</h2>
               <p>Make sure the timing feels right, then verify login and send a live test.</p>
             </div>

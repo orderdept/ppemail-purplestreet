@@ -106,6 +106,11 @@ export default async function PurplePricesEmailPage() {
         </article>
       </section>
 
+      <TemplateManager
+        initialTemplate={template}
+        templates={data.templates}
+      />
+
       <CampaignWorkspace
         draft={data.draft}
         suppressions={data.suppressions}
@@ -169,11 +174,6 @@ export default async function PurplePricesEmailPage() {
           </div>
           <SuppressionSearch suppressions={data.suppressions} />
         </article>
-
-        <TemplateManager
-          initialTemplate={template}
-          templates={data.templates}
-        />
 
         <article className="panel">
           <p className="section-step">Delivery watch</p>
