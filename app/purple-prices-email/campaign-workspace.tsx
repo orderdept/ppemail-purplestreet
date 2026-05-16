@@ -135,7 +135,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   const [csvContacts, setCsvContacts] = useState<CampaignContact[]>(initialDraft.csvContacts);
   const [typedContacts, setTypedContacts] = useState<CampaignContact[]>(initialDraft.typedContacts);
   const [pasteText, setPasteText] = useState(initialDraft.pasteText);
-  const [saveStatus, setSaveStatus] = useState("Hosted sending is the next cutover. For now, this saves the live setup and contact list.");
+  const [saveStatus, setSaveStatus] = useState("Save your audience and delivery settings so the campaign is ready when you come back.");
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -171,7 +171,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
 
   async function saveSetup(nextDraft = draft, nextCsvContacts = csvContacts, nextTypedContacts = typedContacts, nextPasteText = pasteText) {
     setSaving(true);
-    setSaveStatus("Saving the hosted campaign setup...");
+    setSaveStatus("Saving the campaign setup...");
     try {
       const response = await fetch("/api/purple-prices/campaign-draft", {
         method: "POST",
@@ -185,11 +185,11 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error || "Could not save the hosted campaign setup.");
+        throw new Error(data.error || "Could not save the campaign setup.");
       }
-      setSaveStatus(`Saved ${data.contactCount || 0} contacts to PS.`);
+      setSaveStatus(`Saved ${data.contactCount || 0} contacts to Purplestreet.`);
     } catch (error) {
-      setSaveStatus(error instanceof Error ? error.message : "Could not save the hosted campaign setup.");
+      setSaveStatus(error instanceof Error ? error.message : "Could not save the campaign setup.");
     } finally {
       setSaving(false);
     }
@@ -222,96 +222,98 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   const visibleRows = contacts.slice(0, 300);
 
   return (
-    <>
-      <section className="stat-grid stat-grid-four">
-        <article className="stat-card">
-          <span>Ready</span>
-          <strong>{counts.ready.toLocaleString()}</strong>
-        </article>
-        <article className="stat-card">
-          <span>Duplicates</span>
-          <strong>{counts.duplicate.toLocaleString()}</strong>
-        </article>
-        <article className="stat-card">
-          <span>Suppressed in list</span>
-          <strong>{counts.suppressedCount.toLocaleString()}</strong>
-        </article>
-        <article className="stat-card">
-          <span>Send window</span>
-          <strong>{counts.window}</strong>
-        </article>
-      </section>
-
-      <section className="content-grid">
-        <article className="panel wide">
-          <div className="section-head">
-            <div>
-              <h2>Customer list</h2>
-              <p>Upload CSV, paste addresses, or both. The hosted panel normalizes, dedupes, and checks against the live suppression list.</p>
-            </div>
-            <div className="button-row">
-              <button className="action-link ghost button-like" disabled={saving} onClick={() => void saveSetup()} type="button">
-                Save setup
-              </button>
-              <button className="action-link ghost button-like" disabled={saving} onClick={() => void handleClearList()} type="button">
-                Clear list
-              </button>
-            </div>
+    <section className="workflow-stack">
+      <article className="panel wide">
+        <div className="section-head">
+          <div>
+            <p className="section-step">Step 1</p>
+            <h2>Build the audience</h2>
+            <p>Upload a CSV, paste addresses, or combine both. The list is cleaned as it comes in so you can see what is truly ready.</p>
           </div>
-
-          <div className="host-form-grid">
-            <label className="field">
-              <span>Upload CSV</span>
-              <input ref={fileInputRef} accept=".csv,.txt" onChange={handleCsvChange} type="file" />
-            </label>
-            <label className="field">
-              <span>Paste email addresses</span>
-              <textarea
-                onChange={(event) => void handlePasteChange(event.target.value)}
-                placeholder={"customer@example.com\nJane Customer <jane@example.com>\nJane Customer, jane@example.com"}
-                rows={8}
-                value={pasteText}
-              />
-            </label>
+          <div className="button-row">
+            <button className="action-link ghost button-like" disabled={saving} onClick={() => void saveSetup()} type="button">
+              Save setup
+            </button>
+            <button className="action-link ghost button-like" disabled={saving} onClick={() => void handleClearList()} type="button">
+              Clear list
+            </button>
           </div>
+        </div>
 
-          <small className="template-status">{saveStatus}</small>
+        <div className="workflow-summary-bar">
+          <div className="workflow-summary-item">
+            <span>Ready</span>
+            <strong>{counts.ready.toLocaleString()}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span>Duplicates</span>
+            <strong>{counts.duplicate.toLocaleString()}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span>Suppressed</span>
+            <strong>{counts.suppressedCount.toLocaleString()}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span>Send window</span>
+            <strong>{counts.window}</strong>
+          </div>
+        </div>
 
-          <div className="table-wrap top-gap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Name</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.length ? (
-                  visibleRows.map((contact) => (
-                    <tr key={`${contact.email}-${contact.status}`}>
-                      <td>{contact.email}</td>
-                      <td>{contact.name || defaultContactName}</td>
-                      <td>
-                        <span className={`status-chip ${contact.status}`}>{contact.status}</span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3}>No contacts loaded yet.</td>
+        <div className="host-form-grid">
+          <label className="field">
+            <span>Upload CSV</span>
+            <input ref={fileInputRef} accept=".csv,.txt" onChange={handleCsvChange} type="file" />
+          </label>
+          <label className="field">
+            <span>Paste email addresses</span>
+            <textarea
+              onChange={(event) => void handlePasteChange(event.target.value)}
+              placeholder={"customer@example.com\nJane Customer <jane@example.com>\nJane Customer, jane@example.com"}
+              rows={8}
+              value={pasteText}
+            />
+          </label>
+        </div>
+
+        <small className="template-status">{saveStatus}</small>
+
+        <div className="table-wrap top-gap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.length ? (
+                visibleRows.map((contact) => (
+                  <tr key={`${contact.email}-${contact.status}`}>
+                    <td>{contact.email}</td>
+                    <td>{contact.name || defaultContactName}</td>
+                    <td>
+                      <span className={`status-chip ${contact.status}`}>{contact.status}</span>
+                    </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3}>No contacts loaded yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
 
+      <div className="split-grid">
         <article className="panel">
           <div className="section-head">
             <div>
-              <h2>SMTP &amp; limits</h2>
-              <p>These are the live sending defaults PS will use once the hosted sender takes over.</p>
+              <p className="section-step">Step 2</p>
+              <h2>Set delivery rules</h2>
+              <p>Keep the sender identity, pacing, and cap aligned with how Purple Prices should send.</p>
             </div>
           </div>
 
@@ -327,9 +329,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
               <span>Port</span>
               <input
                 min={1}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, smtpPort: Number(event.target.value || 465) }))
-                }
+                onChange={(event) => setDraft((current) => ({ ...current, smtpPort: Number(event.target.value || 465) }))}
                 type="number"
                 value={draft.smtpPort}
               />
@@ -350,7 +350,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
               </select>
             </label>
             <label className="field">
-              <span>Username / sender email</span>
+              <span>Sender email</span>
               <input
                 onChange={(event) => setDraft((current) => ({ ...current, smtpUsername: event.target.value }))}
                 type="email"
@@ -368,9 +368,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
               <span>Daily campaign cap</span>
               <input
                 min={1}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, dailyLimit: Number(event.target.value || 800) }))
-                }
+                onChange={(event) => setDraft((current) => ({ ...current, dailyLimit: Number(event.target.value || 800) }))}
                 type="number"
                 value={draft.dailyLimit}
               />
@@ -380,9 +378,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
               <input
                 max={5}
                 min={1}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, perSecond: Number(event.target.value || 3) }))
-                }
+                onChange={(event) => setDraft((current) => ({ ...current, perSecond: Number(event.target.value || 3) }))}
                 type="number"
                 value={draft.perSecond}
               />
@@ -412,27 +408,39 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
         </article>
 
         <article className="panel">
-          <h2>Queue plan</h2>
-          <div className="meta-stack">
+          <div className="section-head">
             <div>
+              <p className="section-step">Step 3</p>
+              <h2>Run a final check</h2>
+              <p>Make sure the timing feels right, then verify login and send a live test.</p>
+            </div>
+          </div>
+
+          <div className="checklist-block">
+            <div className="checklist-row">
+              <span>Ready to send</span>
+              <strong>{counts.ready.toLocaleString()} contacts</strong>
+            </div>
+            <div className="checklist-row">
               <span>Next send interval</span>
               <strong>{formatDuration(counts.spacing)}</strong>
             </div>
-            <div>
-              <span>Estimated completion</span>
+            <div className="checklist-row">
+              <span>Projected completion</span>
               <strong>{counts.completion}</strong>
             </div>
-            <div>
-              <span>Hosted send actions</span>
-              <strong>Live test ready</strong>
+            <div className="checklist-row">
+              <span>Saved template</span>
+              <strong>{templateName || "No message saved yet"}</strong>
             </div>
           </div>
+
           <HostedSendActions templateName={templateName} />
-          <p>
-            PS now has the hosted mail login check and hosted test send. The next slice is turning that same mail layer into the real campaign queue and scheduler.
+          <p className="quiet-note">
+            Use the login check first if anything looks off, then send a live test before the full campaign run.
           </p>
         </article>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

@@ -11,7 +11,7 @@ export function HostedSendActions({ templateName }: Props) {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [message, setMessage] = useState(
     templateName
-      ? `Send Test uses the currently saved message template: ${templateName}.`
+      ? `Send Test will use the saved message template: ${templateName}.`
       : "Save a message template before trying the hosted test send.",
   );
   const [isError, setIsError] = useState(false);
@@ -51,7 +51,7 @@ export function HostedSendActions({ templateName }: Props) {
           onClick={() => void runAction("/api/purple-prices/smtp-test", "login")}
           type="button"
         >
-          {isTestingLogin ? "Testing login..." : "Test Login"}
+          {isTestingLogin ? "Testing login..." : "Check sender login"}
         </button>
         <button
           className="action-button"
@@ -59,7 +59,7 @@ export function HostedSendActions({ templateName }: Props) {
           onClick={() => void runAction("/api/purple-prices/send-test", "send")}
           type="button"
         >
-          {isSendingTest ? "Sending test..." : "Send Test"}
+          {isSendingTest ? "Sending test..." : "Send live test"}
         </button>
       </div>
       <p className={`inline-status ${isError ? "error-text" : ""}`}>{message}</p>

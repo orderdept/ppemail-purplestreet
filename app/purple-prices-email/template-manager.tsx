@@ -142,8 +142,9 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
     <article className="panel wide">
       <div className="section-head host-section-head">
         <div>
-          <h2>Message templates</h2>
-          <p>Save messages for later, reload them for editing, and keep your current offer copy on PS.</p>
+          <p className="section-step">Step 4</p>
+          <h2>Shape the message</h2>
+          <p>Keep reusable campaign copy here so subject, preview text, body, and footer stay in sync.</p>
         </div>
       </div>
 
@@ -218,7 +219,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
           />
         </label>
         <label className="field">
-          <span>Inbox snippet</span>
+          <span>Inbox preview</span>
           <input
             type="text"
             value={previewText}
@@ -226,7 +227,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
           />
         </label>
         <label className="field full">
-          <span>Message</span>
+          <span>Campaign message</span>
           <textarea
             rows={14}
             value={body}
@@ -234,7 +235,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
           />
         </label>
         <label className="field full">
-          <span>Mailing address for compliance footer</span>
+          <span>Footer mailing address</span>
           <textarea
             rows={3}
             value={mailingAddress}

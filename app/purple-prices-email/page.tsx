@@ -25,27 +25,60 @@ export default async function PurplePricesEmailPage() {
     <main className="shell">
       <div className="page-top">
         <div>
-          <p className="eyebrow">Purplestreet / Purple Prices</p>
+          <p className="eyebrow">Purplestreet / Campaign Control</p>
           <h1>Purple Prices Email</h1>
           <p className="lede">
-            Purple Prices is now living on PS in earnest. The hosted panel is
-            carrying the real suppression list, saved messages, campaign setup,
-            and the finished campaign history while we move the live sender
-            across piece by piece.
+            Plan a campaign, keep the audience clean, test delivery, and keep a
+            close eye on results from one place.
           </p>
         </div>
-        <div className="status-pill">Hosted on PS</div>
+        <div className="page-top-actions">
+          <div className="status-pill">{campaign?.status || "Ready"}</div>
+          <Link className="action-link ghost subtle-link" href="/">
+            Back to PS
+          </Link>
+        </div>
       </div>
 
+      <section className="hero-band">
+        <div className="hero-band-copy">
+          <div className="hero-label-row">
+            <span className="hero-kicker">Current campaign</span>
+            <span className="hero-inline-meta">
+              {campaign?.subject || template?.message.subject || "No subject yet"}
+            </span>
+          </div>
+          <div className="hero-progress-row">
+            <div className="hero-progress-track" aria-hidden="true">
+              <span
+                className="hero-progress-fill"
+                style={{
+                  width: `${campaign?.total ? Math.min(100, (((campaign?.sent || 0) + (campaign?.failed || 0)) / campaign.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
+            <strong className="hero-progress-caption">
+              {campaign?.total
+                ? `${compactNumber((campaign?.sent || 0) + (campaign?.failed || 0))} of ${compactNumber(campaign.total)} processed`
+                : "No campaign history yet"}
+            </strong>
+          </div>
+        </div>
+        <div className="hero-metrics">
+          <div className="hero-metric">
+            <span>Sender</span>
+            <strong>{data.senderName}</strong>
+            <small>{data.senderEmail}</small>
+          </div>
+          <div className="hero-metric">
+            <span>Completed</span>
+            <strong>{formatDateTime(campaign?.completedAt)}</strong>
+            <small>Last finished run</small>
+          </div>
+        </div>
+      </section>
+
       <section className="stat-grid stat-grid-six">
-        <article className="stat-card">
-          <span>From name</span>
-          <strong>{data.senderName}</strong>
-        </article>
-        <article className="stat-card">
-          <span>Sender email</span>
-          <strong>{data.senderEmail}</strong>
-        </article>
         <article className="stat-card">
           <span>Campaign status</span>
           <strong>{campaign?.status || "Ready"}</strong>
@@ -59,8 +92,16 @@ export default async function PurplePricesEmailPage() {
           <strong>{compactNumber(campaign?.failed)}</strong>
         </article>
         <article className="stat-card">
+          <span>Remaining</span>
+          <strong>{compactNumber(remaining)}</strong>
+        </article>
+        <article className="stat-card">
           <span>Suppressions</span>
           <strong>{compactNumber(data.suppressions.length)}</strong>
+        </article>
+        <article className="stat-card">
+          <span>Send rate</span>
+          <strong>{formatRate(campaign?.intervalMs)}</strong>
         </article>
       </section>
 
@@ -74,14 +115,10 @@ export default async function PurplePricesEmailPage() {
         <article className="panel wide">
           <div className="module-row">
             <div>
-              <h2>Latest campaign snapshot</h2>
-              <p>
-                Last subject: <strong>{campaign?.subject || "—"}</strong>
-              </p>
+              <p className="section-step">Campaign snapshot</p>
+              <h2>Performance at a glance</h2>
+              <p>Use this to sanity-check the last run before sending again.</p>
             </div>
-            <Link className="action-link subtle-link" href="/">
-              Back to PS
-            </Link>
           </div>
 
           <div className="detail-grid">
@@ -115,8 +152,9 @@ export default async function PurplePricesEmailPage() {
         </article>
 
         <article className="panel">
-          <h2>Suppression list</h2>
-          <p>{compactNumber(data.suppressions.length)} addresses carried over.</p>
+          <p className="section-step">List hygiene</p>
+          <h2>Suppressions</h2>
+          <p>{compactNumber(data.suppressions.length)} addresses are excluded from future sends.</p>
           <div className="button-row">
             <ImportBouncesButton campaignSubject={campaign?.subject || template?.message.subject || ""} />
           </div>
@@ -143,6 +181,7 @@ export default async function PurplePricesEmailPage() {
         />
 
         <article className="panel">
+          <p className="section-step">Delivery watch</p>
           <h2>Recent failed deliveries</h2>
           {data.recentFailures.length ? (
             <div className="table-wrap">
@@ -169,7 +208,8 @@ export default async function PurplePricesEmailPage() {
         </article>
 
         <article className="panel">
-          <h2>Recent activity</h2>
+          <p className="section-step">Activity</p>
+          <h2>Recent send log</h2>
           <ul className="activity-list">
             {data.recentLog.map((line) => (
               <li key={line}>{line}</li>
