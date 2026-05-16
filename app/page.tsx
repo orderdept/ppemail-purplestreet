@@ -29,6 +29,21 @@ export default function HomePage() {
             </Link>
           </div>
         </article>
+
+        <article className="panel wide">
+          <div className="module-row">
+            <div>
+              <p className="section-step">Panel</p>
+              <h2>BarePlay</h2>
+            </div>
+            <Link
+              className="action-link"
+              href="https://bareplay-email.purplestreet.com/bareplay-email"
+            >
+              Open panel
+            </Link>
+          </div>
+        </article>
       </section>
     </main>
   );
