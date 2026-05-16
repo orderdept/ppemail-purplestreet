@@ -76,8 +76,8 @@ export default async function PurplePricesEmailPage() {
           </div>
           <div className="hero-metric">
             <span>Completed</span>
-            <strong>{formatDateTime(latestCampaign?.completedAt)}</strong>
-            <small>Last finished run</small>
+            <strong>{formatDateTime(campaign?.completedAt)}</strong>
+            <small>{campaign?.completedAt ? "Last finished run" : "Nothing sent yet"}</small>
           </div>
         </div>
       </section>
