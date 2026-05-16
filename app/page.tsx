@@ -38,7 +38,7 @@ export default function HomePage() {
             </div>
             <Link
               className="action-link"
-              href="https://bareplay-email.purplestreet.com/bareplay-email"
+              href="https://bareplay-purplestreet.vercel.app/bareplay-email"
             >
               Open panel
             </Link>
