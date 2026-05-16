@@ -23,10 +23,6 @@ export default function HomePage() {
             <div>
               <p className="section-step">Panel</p>
               <h2>Purple Prices Email</h2>
-              <p>
-                Mail identity stays on <code>purpleprices.com</code>. PS is the
-                hosted admin home.
-              </p>
             </div>
             <Link className="action-link" href="/purple-prices-email">
               Open panel
