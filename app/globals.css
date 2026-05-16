@@ -236,6 +236,14 @@ h1 {
   margin-bottom: 16px;
 }
 
+.campaign-desk {
+  margin-bottom: 16px;
+}
+
+.campaign-desk-block {
+  min-width: 0;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);

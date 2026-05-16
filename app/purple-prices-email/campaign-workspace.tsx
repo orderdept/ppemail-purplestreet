@@ -178,6 +178,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...nextDraft,
+          campaignName: nextDraft.campaignName,
           csvContacts: nextCsvContacts,
           typedContacts: nextTypedContacts,
           pasteText: nextPasteText,

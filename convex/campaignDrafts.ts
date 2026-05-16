@@ -3,6 +3,7 @@ import { v } from "convex/values";
 
 const draftShape = {
   moduleKey: v.string(),
+  campaignName: v.optional(v.string()),
   csvContacts: v.array(
     v.object({
       email: v.string(),

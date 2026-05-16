@@ -4,6 +4,7 @@ import { v } from "convex/values";
 export default defineSchema({
   campaignDrafts: defineTable({
     moduleKey: v.string(),
+    campaignName: v.optional(v.string()),
     csvContacts: v.array(
       v.object({
         email: v.string(),

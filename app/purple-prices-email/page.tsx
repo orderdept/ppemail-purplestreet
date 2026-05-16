@@ -7,6 +7,7 @@ import {
   getPurplePricesData,
 } from "../../lib/purple-prices-data";
 import { CampaignWorkspace } from "./campaign-workspace";
+import { CampaignDesk } from "./campaign-desk";
 import { ImportBouncesButton } from "./import-bounces-button";
 import { SuppressionSearch } from "./suppression-search";
 import { TemplateManager } from "./template-manager";
@@ -105,6 +106,8 @@ export default async function PurplePricesEmailPage() {
           <strong>{formatRate(campaign?.intervalMs)}</strong>
         </article>
       </section>
+
+      <CampaignDesk draft={data.draft} campaigns={data.campaigns} />
 
       <TemplateManager
         initialTemplate={template}

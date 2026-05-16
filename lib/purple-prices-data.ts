@@ -68,6 +68,7 @@ function draftFromCampaign(campaign: CampaignJob | null): CampaignDraft {
   const inferredPerSecond = Math.max(1, Math.min(5, Math.round(1000 / intervalMs)));
 
   return {
+    campaignName: campaign?.subject || "",
     csvContacts: [],
     typedContacts: [],
     pasteText: "",
