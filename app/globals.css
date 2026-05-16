@@ -507,6 +507,33 @@ h1 {
   padding: 8px 10px;
 }
 
+.suppression-search-block {
+  margin-top: 16px;
+}
+
+.suppression-search-results {
+  margin-top: 10px;
+}
+
+.suppression-match-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 12px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 0;
+}
+
+.suppression-match-list li {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
 .table-wrap {
   overflow: auto;
 }

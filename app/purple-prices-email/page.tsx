@@ -8,6 +8,7 @@ import {
 } from "../../lib/purple-prices-data";
 import { CampaignWorkspace } from "./campaign-workspace";
 import { ImportBouncesButton } from "./import-bounces-button";
+import { SuppressionSearch } from "./suppression-search";
 import { TemplateManager } from "./template-manager";
 
 export const dynamic = "force-dynamic";
@@ -166,13 +167,7 @@ export default async function PurplePricesEmailPage() {
               Download JSON
             </a>
           </div>
-          <div className="pill-list">
-            {data.suppressions.slice(0, 18).map((email) => (
-              <span className="email-pill" key={email}>
-                {email}
-              </span>
-            ))}
-          </div>
+          <SuppressionSearch suppressions={data.suppressions} />
         </article>
 
         <TemplateManager
