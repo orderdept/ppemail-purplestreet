@@ -61,6 +61,11 @@ export function CampaignDesk({ draft, campaigns }: Props) {
         body: JSON.stringify({
           ...draft,
           campaignName: nextName,
+          draftMessageName: resetList ? "" : draft.draftMessageName,
+          messageSubject: resetList ? "" : draft.messageSubject,
+          messagePreviewText: resetList ? "" : draft.messagePreviewText,
+          messageBody: resetList ? "" : draft.messageBody,
+          messageMailingAddress: resetList ? "" : draft.messageMailingAddress,
           csvContacts: resetList ? [] : draft.csvContacts,
           typedContacts: resetList ? [] : draft.typedContacts,
           pasteText: resetList ? "" : draft.pasteText,

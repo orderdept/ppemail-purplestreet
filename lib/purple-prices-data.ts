@@ -84,6 +84,11 @@ function draftFromCampaign(campaign: CampaignJob | null): CampaignDraft {
 
   return {
     campaignName: campaign?.subject || "",
+    draftMessageName: "",
+    messageSubject: "",
+    messagePreviewText: "",
+    messageBody: "",
+    messageMailingAddress: "",
     csvContacts: [],
     typedContacts: [],
     pasteText: "",

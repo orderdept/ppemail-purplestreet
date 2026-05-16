@@ -12,6 +12,11 @@ export type CampaignContact = {
 
 export type CampaignDraft = {
   campaignName: string;
+  draftMessageName: string;
+  messageSubject: string;
+  messagePreviewText: string;
+  messageBody: string;
+  messageMailingAddress: string;
   csvContacts: CampaignContact[];
   typedContacts: CampaignContact[];
   pasteText: string;

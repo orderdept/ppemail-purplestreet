@@ -179,6 +179,11 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
         body: JSON.stringify({
           ...nextDraft,
           campaignName: nextDraft.campaignName,
+          draftMessageName: nextDraft.draftMessageName,
+          messageSubject: nextDraft.messageSubject,
+          messagePreviewText: nextDraft.messagePreviewText,
+          messageBody: nextDraft.messageBody,
+          messageMailingAddress: nextDraft.messageMailingAddress,
           csvContacts: nextCsvContacts,
           typedContacts: nextTypedContacts,
           pasteText: nextPasteText,

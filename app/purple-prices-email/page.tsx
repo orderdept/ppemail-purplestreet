@@ -111,10 +111,7 @@ export default async function PurplePricesEmailPage() {
 
       <CampaignDesk draft={data.draft} campaigns={data.campaigns} />
 
-      <TemplateManager
-        initialTemplate={template}
-        templates={data.templates}
-      />
+      <TemplateManager draft={data.draft} templates={data.templates} />
 
       <CampaignWorkspace
         draft={data.draft}

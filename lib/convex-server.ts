@@ -89,6 +89,11 @@ export async function getConvexCampaignDraft() {
   }
   return {
     campaignName: row.campaignName || "",
+    draftMessageName: row.draftMessageName || "",
+    messageSubject: row.messageSubject || "",
+    messagePreviewText: row.messagePreviewText || "",
+    messageBody: row.messageBody || "",
+    messageMailingAddress: row.messageMailingAddress || "",
     csvContacts: row.csvContacts,
     typedContacts: row.typedContacts,
     pasteText: row.pasteText,
@@ -135,6 +140,11 @@ export async function upsertConvexCampaignDraft(draft: CampaignDraft) {
   return await client.mutation(api.campaignDrafts.upsertForModule, {
     moduleKey,
     campaignName: draft.campaignName,
+    draftMessageName: draft.draftMessageName,
+    messageSubject: draft.messageSubject,
+    messagePreviewText: draft.messagePreviewText,
+    messageBody: draft.messageBody,
+    messageMailingAddress: draft.messageMailingAddress,
     csvContacts: draft.csvContacts,
     typedContacts: draft.typedContacts,
     pasteText: draft.pasteText,

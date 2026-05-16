@@ -22,6 +22,11 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Partial<CampaignDraft>;
     const draft: CampaignDraft = {
       campaignName: typeof body.campaignName === "string" ? body.campaignName.trim() : "",
+      draftMessageName: typeof body.draftMessageName === "string" ? body.draftMessageName.trim() : "",
+      messageSubject: typeof body.messageSubject === "string" ? body.messageSubject : "",
+      messagePreviewText: typeof body.messagePreviewText === "string" ? body.messagePreviewText : "",
+      messageBody: typeof body.messageBody === "string" ? body.messageBody : "",
+      messageMailingAddress: typeof body.messageMailingAddress === "string" ? body.messageMailingAddress : "",
       csvContacts: sanitizeContacts(body.csvContacts),
       typedContacts: sanitizeContacts(body.typedContacts),
       pasteText: typeof body.pasteText === "string" ? body.pasteText : "",

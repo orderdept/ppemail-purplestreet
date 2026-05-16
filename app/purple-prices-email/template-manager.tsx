@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { type SavedTemplate } from "../../lib/purple-prices-types";
+import { type CampaignDraft, type SavedTemplate } from "../../lib/purple-prices-types";
 
 type Props = {
-  initialTemplate: SavedTemplate | null;
+  draft: CampaignDraft;
   templates: SavedTemplate[];
 };
 
@@ -24,7 +24,7 @@ function blankMessage() {
   };
 }
 
-export function TemplateManager({ initialTemplate, templates }: Props) {
+export function TemplateManager({ draft, templates }: Props) {
   const router = useRouter();
   const sortedTemplates = useMemo(
     () =>
@@ -33,22 +33,69 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
       ),
     [templates],
   );
-  const [selectedName, setSelectedName] = useState(initialTemplate?.name || "");
-  const [draftName, setDraftName] = useState(initialTemplate?.name || "");
-  const [subject, setSubject] = useState(initialTemplate?.message.subject || "");
-  const [previewText, setPreviewText] = useState(
-    initialTemplate?.message.previewText || "",
-  );
-  const [body, setBody] = useState(initialTemplate?.message.body || "");
-  const [mailingAddress, setMailingAddress] = useState(
-    initialTemplate?.message.mailingAddress || "",
-  );
+  const [selectedName, setSelectedName] = useState(draft.draftMessageName || "");
+  const [draftName, setDraftName] = useState(draft.draftMessageName || "");
+  const [subject, setSubject] = useState(draft.messageSubject || "");
+  const [previewText, setPreviewText] = useState(draft.messagePreviewText || "");
+  const [body, setBody] = useState(draft.messageBody || "");
+  const [mailingAddress, setMailingAddress] = useState(draft.messageMailingAddress || "");
   const [status, setStatus] = useState(
-    sortedTemplates.length ? "Choose a saved message or save your edits." : "No saved messages yet.",
+    sortedTemplates.length
+      ? "Choose a saved message or save your edits."
+      : "No saved messages yet.",
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPersistingDraft, setIsPersistingDraft] = useState(false);
   const selectedTemplate = sortedTemplates.find((template) => template.name === selectedName) || null;
+
+  useEffect(() => {
+    setSelectedName(draft.draftMessageName || "");
+    setDraftName(draft.draftMessageName || "");
+    setSubject(draft.messageSubject || "");
+    setPreviewText(draft.messagePreviewText || "");
+    setBody(draft.messageBody || "");
+    setMailingAddress(draft.messageMailingAddress || "");
+  }, [
+    draft.draftMessageName,
+    draft.messageBody,
+    draft.messageMailingAddress,
+    draft.messagePreviewText,
+    draft.messageSubject,
+  ]);
+
+  async function persistDraftMessage(next: {
+    draftMessageName?: string;
+    subject?: string;
+    previewText?: string;
+    body?: string;
+    mailingAddress?: string;
+  }) {
+    setIsPersistingDraft(true);
+    try {
+      const response = await fetch("/api/purple-prices/campaign-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...draft,
+          campaignName: draft.campaignName,
+          draftMessageName: next.draftMessageName ?? draftName,
+          messageSubject: next.subject ?? subject,
+          messagePreviewText: next.previewText ?? previewText,
+          messageBody: next.body ?? body,
+          messageMailingAddress: next.mailingAddress ?? mailingAddress,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Could not save the campaign message.");
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not save the campaign message.");
+    } finally {
+      setIsPersistingDraft(false);
+    }
+  }
 
   function applyTemplate(template: SavedTemplate | null) {
     if (!template) {
@@ -61,6 +108,13 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
     setBody(template.message.body || "");
     setMailingAddress(template.message.mailingAddress || "");
     setStatus(`Loaded "${template.name}".`);
+    void persistDraftMessage({
+      draftMessageName: template.name,
+      subject: template.message.subject || "",
+      previewText: template.message.previewText || "",
+      body: template.message.body || "",
+      mailingAddress: template.message.mailingAddress || "",
+    });
   }
 
   async function handleSave() {
@@ -136,6 +190,13 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
     setBody(empty.body);
     setMailingAddress(empty.mailingAddress);
     setStatus("Started a new draft.");
+    void persistDraftMessage({
+      draftMessageName: "",
+      subject: "",
+      previewText: "",
+      body: "",
+      mailingAddress: "",
+    });
   }
 
   return (
@@ -206,7 +267,9 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
             New Draft
           </button>
         </div>
-        <small className="template-status">{status}</small>
+        <small className="template-status">
+          {isPersistingDraft ? "Saving campaign draft..." : status}
+        </small>
       </div>
 
       <div className="form-grid host-form-grid">
@@ -216,6 +279,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
             type="text"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
+            onBlur={() => void persistDraftMessage({ subject })}
           />
         </label>
         <label className="field">
@@ -224,6 +288,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
             type="text"
             value={previewText}
             onChange={(event) => setPreviewText(event.target.value)}
+            onBlur={() => void persistDraftMessage({ previewText })}
           />
         </label>
         <label className="field full">
@@ -232,6 +297,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
             rows={14}
             value={body}
             onChange={(event) => setBody(event.target.value)}
+            onBlur={() => void persistDraftMessage({ body })}
           />
         </label>
         <label className="field full">
@@ -240,6 +306,7 @@ export function TemplateManager({ initialTemplate, templates }: Props) {
             rows={3}
             value={mailingAddress}
             onChange={(event) => setMailingAddress(event.target.value)}
+            onBlur={() => void persistDraftMessage({ mailingAddress })}
           />
         </label>
       </div>
