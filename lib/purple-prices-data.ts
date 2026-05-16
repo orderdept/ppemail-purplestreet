@@ -46,6 +46,21 @@ type CampaignSummary = {
   >;
 };
 
+type DraftSnapshot = {
+  completedAt: null;
+  currentBatch: 0;
+  dailyLimit: number;
+  failed: number;
+  id: string;
+  intervalMs: number;
+  nextRunAt: null;
+  sent: number;
+  status: string;
+  subject: string;
+  total: number;
+  totalBatches: 0;
+};
+
 const moduleKey = "purple-prices-email";
 const dataRoot = path.join(process.cwd(), "data", "purple-prices");
 
@@ -83,6 +98,49 @@ function draftFromCampaign(campaign: CampaignJob | null): CampaignDraft {
   };
 }
 
+function summarizeDraft(draft: CampaignDraft, suppressions: string[]): DraftSnapshot {
+  const seen = new Set<string>();
+  const suppressedSet = new Set(suppressions);
+  let ready = 0;
+  let duplicates = 0;
+  let suppressed = 0;
+
+  for (const contact of [...draft.csvContacts, ...draft.typedContacts]) {
+    if (suppressedSet.has(contact.email)) {
+      suppressed += 1;
+      continue;
+    }
+    if (seen.has(contact.email)) {
+      duplicates += 1;
+      continue;
+    }
+    seen.add(contact.email);
+    ready += 1;
+  }
+
+  const intervalMs =
+    draft.spacingMode === "daily"
+      ? Math.ceil((24 * 60 * 60 * 1000) / Math.max(1, draft.dailyLimit || 1))
+      : Math.ceil(1000 / Math.max(1, Math.min(5, draft.perSecond || 1)));
+
+  const status = ready || duplicates || suppressed ? "Draft" : "New draft";
+
+  return {
+    completedAt: null,
+    currentBatch: 0,
+    dailyLimit: draft.dailyLimit,
+    failed: 0,
+    id: `draft-${moduleKey}`,
+    intervalMs,
+    nextRunAt: null,
+    sent: 0,
+    status,
+    subject: draft.campaignName || "Untitled campaign",
+    total: ready,
+    totalBatches: 0,
+  };
+}
+
 export async function getPurplePricesData() {
   const [fileSuppressions, fileTemplates, campaignSummary, liveSuppressions, liveTemplates, liveDraft] = await Promise.all([
     readJson<string[]>("suppressions.json"),
@@ -102,6 +160,7 @@ export async function getPurplePricesData() {
   const recentLog = [...(latestCampaign?.recentLog || [])].reverse();
   const recentFailures = [...(latestCampaign?.recentFailures || [])].reverse();
   const draft = liveDraft || draftFromCampaign(latestCampaign);
+  const currentDraftCampaign = summarizeDraft(draft, suppressions);
 
   return {
     moduleKey,
@@ -111,6 +170,7 @@ export async function getPurplePricesData() {
     senderEmail: latestCampaign?.smtp?.username || "support@purpleprices.com",
     senderName: latestCampaign?.smtp?.fromName || "Purple Prices",
     latestCampaign,
+    currentDraftCampaign,
     latestTemplate,
     draft,
     suppressions,

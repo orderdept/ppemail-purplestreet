@@ -113,7 +113,7 @@ export function CampaignDesk({ draft, campaigns }: Props) {
             <button
               className="action-link ghost button-like"
               disabled={isSaving}
-              onClick={() => void saveCampaignShell(suggestedCampaignName(), true)}
+              onClick={() => void saveCampaignShell(campaignName.trim() || suggestedCampaignName(), true)}
               type="button"
             >
               Start new campaign
