@@ -41,21 +41,38 @@ function htmlEscape(value: string) {
     .replaceAll('"', "&quot;");
 }
 
+function linkifyHtml(value: string) {
+  return htmlEscape(value).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#6d29a4;text-decoration:underline;">$1</a>');
+}
+
 function htmlParagraphs(text: string) {
   return String(text || "")
     .trim()
     .split(/\n\s*\n+/)
     .filter(Boolean)
     .map((block) => {
-      const lines = block
+      const rows = block
         .split(/\r?\n/)
         .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => htmlEscape(line))
-        .join("<br />");
-      return `<p style="margin:0 0 14px 0;">${lines}</p>`;
+        .filter(Boolean);
+
+      const isBulletBlock = rows.every((line) => /^[-*]\s+/.test(line));
+      if (isBulletBlock) {
+        const items = rows
+          .map((line) => line.replace(/^[-*]\s+/, ""))
+          .map((line) => `<li>${linkifyHtml(line)}</li>`)
+          .join("");
+        return `<ul style="margin:0 0 14px 20px;padding:0;">${items}</ul>`;
+      }
+
+      const lines = rows.map((line) => linkifyHtml(line)).join("<br />");
+      return `<p style="margin:0 0 14px 0;text-align:left;letter-spacing:normal;word-spacing:normal;">${lines}</p>`;
     })
     .join("");
+}
+
+function linkifyText(value: string) {
+  return String(value || "").replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)");
 }
 
 function buildHtmlBody(message: CampaignMessage, contact: MailRecipient) {
@@ -70,7 +87,7 @@ function buildHtmlBody(message: CampaignMessage, contact: MailRecipient) {
 
   return `<!doctype html>
 <html>
-  <body style="font-family: Arial, sans-serif; color: #201725; line-height: 1.45; margin:0; padding:0;">
+  <body style="font-family: Arial, sans-serif; color: #201725; line-height: 1.45; margin:0; padding:0; text-align:left; letter-spacing:normal; word-spacing:normal;">
     <span style="display:none!important;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${preview}</span>
     ${body}
     <hr style="border:0;border-top:1px solid #eadfed;margin:22px 0;" />
@@ -85,7 +102,7 @@ function buildHtmlBody(message: CampaignMessage, contact: MailRecipient) {
 
 function buildTextBody(message: CampaignMessage, contact: MailRecipient) {
   return [
-    personalize(message.body, contact).trim(),
+    linkifyText(personalize(message.body, contact)).trim(),
     "",
     "You are receiving this because you are on the Purple Prices customer list.",
     "",
@@ -323,5 +340,55 @@ export async function sendHostedPurplePricesTestEmail(draft: CampaignDraft, mess
     to: recipient.email,
     name: recipient.name,
     from: config.username,
+  };
+}
+
+export async function sendHostedPurplePricesCampaign(
+  draft: CampaignDraft,
+  message: CampaignMessage,
+  recipients: MailRecipient[],
+) {
+  const config = hostedSmtpConfigFromDraft(draft);
+  const session = await SmtpSession.connect(config);
+  const interval = draft.spacingMode === "daily"
+    ? Math.ceil((24 * 60 * 60 * 1000) / Math.max(1, draft.dailyLimit || 1))
+    : Math.ceil(1000 / Math.max(1, Math.min(5, draft.perSecond || 1)));
+  const results: Array<{ email: string; name: string; status: "sent" | "failed"; error?: string; recordedAt: string }> = [];
+  try {
+    if (config.security === "ssl") {
+      await session.command(`EHLO ${config.host}`, [250]);
+    }
+    await session.authLogin(config.username, config.password);
+    for (let index = 0; index < recipients.length; index += 1) {
+      const recipient = recipients[index];
+      try {
+        await session.sendMail(config, message, recipient);
+        results.push({
+          email: recipient.email,
+          name: recipient.name,
+          status: "sent",
+          recordedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        results.push({
+          email: recipient.email,
+          name: recipient.name,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Delivery failed.",
+          recordedAt: new Date().toISOString(),
+        });
+      }
+      if (index < recipients.length - 1 && interval > 0) {
+        await new Promise((resolve) => setTimeout(resolve, interval));
+      }
+    }
+  } finally {
+    await session.quit();
+  }
+
+  return {
+    from: config.username,
+    intervalMs: interval,
+    results,
   };
 }

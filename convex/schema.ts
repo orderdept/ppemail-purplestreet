@@ -56,6 +56,20 @@ export default defineSchema({
     totalBatches: v.number(),
     nextRunAt: v.optional(v.string()),
     completedAt: v.optional(v.string()),
+    recentLog: v.optional(v.array(v.string())),
+    recentFailures: v.optional(
+      v.array(
+        v.object({
+          email: v.string(),
+          error: v.optional(v.string()),
+          name: v.optional(v.string()),
+          recordedAt: v.optional(v.string()),
+          status: v.union(v.literal("sent"), v.literal("failed")),
+        }),
+      ),
+    ),
+    smtpFromName: v.optional(v.string()),
+    smtpUsername: v.optional(v.string()),
     updatedAt: v.string(),
   }).index("by_module", ["moduleKey"]),
 
@@ -76,6 +90,7 @@ export default defineSchema({
 
   templates: defineTable({
     moduleKey: v.string(),
+    campaignName: v.optional(v.string()),
     name: v.string(),
     subject: v.string(),
     previewText: v.string(),

@@ -4,18 +4,23 @@ import { v } from "convex/values";
 export const listByModule = query({
   args: {
     moduleKey: v.string(),
+    campaignName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const rows = await ctx.db
       .query("templates")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
       .collect();
+    if (!args.campaignName) return rows;
+    const matchName = args.campaignName.trim().toLowerCase();
+    return rows.filter((row) => row.campaignName.trim().toLowerCase() === matchName);
   },
 });
 
 export const upsertForModule = mutation({
   args: {
     moduleKey: v.string(),
+    campaignName: v.string(),
     name: v.string(),
     subject: v.string(),
     previewText: v.string(),
@@ -29,10 +34,13 @@ export const upsertForModule = mutation({
       .collect();
 
     const match = existing.find(
-      (row) => row.name.trim().toLowerCase() === args.name.trim().toLowerCase(),
+      (row) =>
+        row.campaignName.trim().toLowerCase() === args.campaignName.trim().toLowerCase() &&
+        row.name.trim().toLowerCase() === args.name.trim().toLowerCase(),
     );
     const updatedAt = new Date().toISOString();
     const values = {
+      campaignName: args.campaignName.trim(),
       name: args.name.trim(),
       subject: args.subject,
       previewText: args.previewText,
@@ -57,6 +65,7 @@ export const upsertForModule = mutation({
 export const deleteForModule = mutation({
   args: {
     moduleKey: v.string(),
+    campaignName: v.string(),
     name: v.string(),
   },
   handler: async (ctx, args) => {
@@ -66,7 +75,9 @@ export const deleteForModule = mutation({
       .collect();
 
     const match = existing.find(
-      (row) => row.name.trim().toLowerCase() === args.name.trim().toLowerCase(),
+      (row) =>
+        row.campaignName.trim().toLowerCase() === args.campaignName.trim().toLowerCase() &&
+        row.name.trim().toLowerCase() === args.name.trim().toLowerCase(),
     );
     if (!match) {
       return { deleted: false };

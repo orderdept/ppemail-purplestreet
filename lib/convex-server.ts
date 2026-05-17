@@ -67,6 +67,27 @@ export async function getConvexTemplates() {
   const rows = await client.query(api.templates.listByModule, { moduleKey });
   return rows.map<SavedTemplate>((row) => ({
     id: String(row._id),
+    campaignName: row.campaignName,
+    name: row.name,
+    updatedAt: row.updatedAt,
+    message: {
+      subject: row.subject,
+      previewText: row.previewText,
+      body: row.body,
+      mailingAddress: row.mailingAddress,
+    },
+  }));
+}
+
+export async function getConvexTemplatesForCampaign(campaignName: string) {
+  const client = getConvexClient();
+  if (!client) {
+    return null;
+  }
+  const rows = await client.query(api.templates.listByModule, { moduleKey, campaignName });
+  return rows.map<SavedTemplate>((row) => ({
+    id: String(row._id),
+    campaignName: row.campaignName,
     name: row.name,
     updatedAt: row.updatedAt,
     message: {
@@ -109,26 +130,72 @@ export async function getConvexCampaignDraft() {
   } satisfies CampaignDraft;
 }
 
-export async function upsertConvexTemplate(name: string, message: CampaignMessage) {
+export async function upsertConvexTemplate(campaignName: string, name: string, message: CampaignMessage) {
   const client = getConvexClient();
   if (!client) {
     throw new Error("Convex is not configured.");
   }
   return await client.mutation(api.templates.upsertForModule, {
     moduleKey,
+    campaignName,
     name,
     ...message,
   });
 }
 
-export async function deleteConvexTemplate(name: string) {
+export async function deleteConvexTemplate(campaignName: string, name: string) {
   const client = getConvexClient();
   if (!client) {
     throw new Error("Convex is not configured.");
   }
   return await client.mutation(api.templates.deleteForModule, {
     moduleKey,
+    campaignName,
     name,
+  });
+}
+
+export async function getConvexCampaigns() {
+  const client = getConvexClient();
+  if (!client) {
+    return null;
+  }
+  return await client.query(api.campaigns.listByModule, { moduleKey });
+}
+
+export async function recordConvexCampaign(input: {
+  status: "draft" | "queued" | "running" | "scheduled" | "complete" | "failed";
+  subject: string;
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  suppressedCount: number;
+  duplicateCount: number;
+  dailyLimit: number;
+  intervalMs: number;
+  currentBatch: number;
+  totalBatches: number;
+  nextRunAt?: string;
+  completedAt?: string;
+  recentLog?: string[];
+  recentFailures?: Array<{
+    email: string;
+    error?: string;
+    name?: string;
+    recordedAt?: string;
+    status: "sent" | "failed";
+  }>;
+  smtpFromName?: string;
+  smtpUsername?: string;
+}) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.campaigns.recordCampaign, {
+    moduleKey,
+    ...input,
+    updatedAt: new Date().toISOString(),
   });
 }
 

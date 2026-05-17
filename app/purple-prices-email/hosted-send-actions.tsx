@@ -3,12 +3,15 @@
 import { useState } from "react";
 
 type Props = {
+  canStartCampaign: boolean;
+  readyCount: number;
   templateName?: string | null;
 };
 
-export function HostedSendActions({ templateName }: Props) {
+export function HostedSendActions({ canStartCampaign, readyCount, templateName }: Props) {
   const [isTestingLogin, setIsTestingLogin] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [isStartingCampaign, setIsStartingCampaign] = useState(false);
   const [message, setMessage] = useState(
     templateName
       ? `Send Test will use the saved message template: ${templateName}.`
@@ -42,6 +45,32 @@ export function HostedSendActions({ templateName }: Props) {
     }
   }
 
+  async function handleStartCampaign() {
+    if (!canStartCampaign) {
+      setIsError(true);
+      setMessage("Save a message and make sure at least one contact is ready before starting the campaign.");
+      return;
+    }
+    if (!window.confirm(`Start the live campaign for ${readyCount} ready recipients?`)) {
+      return;
+    }
+    setIsStartingCampaign(true);
+    setIsError(false);
+    try {
+      const response = await fetch("/api/purple-prices/send-campaign", { method: "POST" });
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "That hosted campaign could not start.");
+      }
+      setMessage(data.message || "Campaign started.");
+    } catch (error) {
+      setIsError(true);
+      setMessage(error instanceof Error ? error.message : "That hosted campaign could not start.");
+    } finally {
+      setIsStartingCampaign(false);
+    }
+  }
+
   return (
     <div className="live-action-stack top-gap">
       <div className="button-row">
@@ -60,6 +89,14 @@ export function HostedSendActions({ templateName }: Props) {
           type="button"
         >
           {isSendingTest ? "Sending test..." : "Send live test"}
+        </button>
+        <button
+          className="action-button"
+          disabled={isStartingCampaign || !canStartCampaign}
+          onClick={() => void handleStartCampaign()}
+          type="button"
+        >
+          {isStartingCampaign ? "Starting campaign..." : "Start campaign"}
         </button>
       </div>
       <p className={`inline-status ${isError ? "error-text" : ""}`}>{message}</p>

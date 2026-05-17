@@ -396,6 +396,14 @@ h1 {
   font: inherit;
 }
 
+.plain-file-input {
+  appearance: auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
 .inline-input {
   flex: 1 1 220px;
   min-height: 42px;
@@ -435,6 +443,33 @@ h1 {
   resize: vertical;
 }
 
+.choice-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.choice-option {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.choice-option input {
+  appearance: auto;
+  margin: 0;
+  width: auto;
+}
+
+.choice-option span {
+  margin: 0;
+  text-transform: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
 .field.full {
   grid-column: 1 / -1;
 }
@@ -464,6 +499,30 @@ h1 {
 
 .top-gap {
   margin-top: 16px;
+}
+
+.audience-preview {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.audience-preview summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.table-input {
+  appearance: none;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-height: 38px;
+  padding: 8px 10px;
+  width: 100%;
 }
 
 .status-chip {

@@ -13,6 +13,8 @@ type Props = {
 
 type DraftContact = CampaignContact & {
   status: "ready" | "duplicate" | "suppressed";
+  source: "csv" | "typed";
+  sourceIndex: number;
 };
 
 const defaultContactName = "Purple Peeps";
@@ -135,6 +137,8 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   const [csvContacts, setCsvContacts] = useState<CampaignContact[]>(initialDraft.csvContacts);
   const [typedContacts, setTypedContacts] = useState<CampaignContact[]>(initialDraft.typedContacts);
   const [pasteText, setPasteText] = useState(initialDraft.pasteText);
+  const [csvMode, setCsvMode] = useState<"replace" | "add">("replace");
+  const [showAudiencePreview, setShowAudiencePreview] = useState(false);
   const [saveStatus, setSaveStatus] = useState("Save your audience and delivery settings so the campaign is ready when you come back.");
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -142,7 +146,10 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   const suppressionsSet = useMemo(() => new Set(suppressions), [suppressions]);
   const contacts = useMemo(() => {
     const seen = new Set<string>();
-    return [...csvContacts, ...typedContacts].map<DraftContact>((contact) => {
+    return [
+      ...csvContacts.map((contact, index) => ({ ...contact, source: "csv" as const, sourceIndex: index })),
+      ...typedContacts.map((contact, index) => ({ ...contact, source: "typed" as const, sourceIndex: index })),
+    ].map<DraftContact>((contact) => {
       if (suppressionsSet.has(contact.email)) {
         return { ...contact, status: "suppressed" };
       }
@@ -204,8 +211,10 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   async function handleCsvChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const nextCsvContacts = contactsFromCsv(await file.text());
+    const parsedContacts = contactsFromCsv(await file.text());
+    const nextCsvContacts = csvMode === "add" ? [...csvContacts, ...parsedContacts] : parsedContacts;
     setCsvContacts(nextCsvContacts);
+    setShowAudiencePreview(true);
     await saveSetup(draft, nextCsvContacts, typedContacts, pasteText);
   }
 
@@ -213,6 +222,32 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
     const nextTypedContacts = contactsFromPaste(value);
     setPasteText(value);
     setTypedContacts(nextTypedContacts);
+    setShowAudiencePreview(true);
+  }
+
+  async function handleRowEdit(contact: DraftContact, field: "email" | "name", value: string) {
+    if (contact.source === "csv") {
+      const nextCsvContacts = [...csvContacts];
+      const current = nextCsvContacts[contact.sourceIndex];
+      if (!current) return;
+      nextCsvContacts[contact.sourceIndex] = {
+        ...current,
+        [field]: field === "email" ? normalizeEmail(value) || current.email : value,
+      };
+      setCsvContacts(nextCsvContacts);
+      await saveSetup(draft, nextCsvContacts, typedContacts, pasteText);
+      return;
+    }
+
+    const nextTypedContacts = [...typedContacts];
+    const current = nextTypedContacts[contact.sourceIndex];
+    if (!current) return;
+    nextTypedContacts[contact.sourceIndex] = {
+      ...current,
+      [field]: field === "email" ? normalizeEmail(value) || current.email : value,
+    };
+    setTypedContacts(nextTypedContacts);
+    await saveSetup(draft, csvContacts, nextTypedContacts, pasteText);
   }
 
   async function handleClearList() {
@@ -226,6 +261,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   }
 
   const visibleRows = contacts.slice(0, 300);
+  const hasSavedMessage = Boolean(draft.draftMessageName && draft.messageSubject && draft.messageBody);
 
   return (
     <section className="workflow-stack">
@@ -266,9 +302,30 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
         </div>
 
         <div className="host-form-grid">
+          <div className="field full">
+            <span>CSV import mode</span>
+            <div className="choice-row">
+              <label className="choice-option">
+                <input
+                  checked={csvMode === "replace"}
+                  onChange={() => setCsvMode("replace")}
+                  type="checkbox"
+                />
+                <span>Replace current uploaded list</span>
+              </label>
+              <label className="choice-option">
+                <input
+                  checked={csvMode === "add"}
+                  onChange={() => setCsvMode("add")}
+                  type="checkbox"
+                />
+                <span>Add to existing uploaded list</span>
+              </label>
+            </div>
+          </div>
           <label className="field">
             <span>Upload CSV</span>
-            <input ref={fileInputRef} accept=".csv,.txt" onChange={handleCsvChange} type="file" />
+            <input className="plain-file-input" ref={fileInputRef} accept=".csv,.txt" onChange={handleCsvChange} type="file" />
           </label>
           <label className="field">
             <span>Paste email addresses</span>
@@ -283,34 +340,51 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
 
         <small className="template-status">{saveStatus}</small>
 
-        <div className="table-wrap top-gap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.length ? (
-                visibleRows.map((contact) => (
-                  <tr key={`${contact.email}-${contact.status}`}>
-                    <td>{contact.email}</td>
-                    <td>{contact.name || defaultContactName}</td>
-                    <td>
-                      <span className={`status-chip ${contact.status}`}>{contact.status}</span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
+        <details className="audience-preview top-gap" open={showAudiencePreview}>
+          <summary onClick={() => setShowAudiencePreview((current) => !current)}>
+            Audience preview: {counts.ready.toLocaleString()} ready, {counts.duplicate.toLocaleString()} duplicates, {counts.suppressedCount.toLocaleString()} suppressed
+          </summary>
+          <div className="table-wrap top-gap">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={3}>No contacts loaded yet.</td>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Status</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {visibleRows.length ? (
+                  visibleRows.map((contact) => (
+                    <tr key={`${contact.source}-${contact.sourceIndex}-${contact.email}`}>
+                      <td>
+                        <input
+                          className="table-input"
+                          defaultValue={contact.email}
+                          onBlur={(event) => void handleRowEdit(contact, "email", event.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="table-input"
+                          defaultValue={contact.name || defaultContactName}
+                          onBlur={(event) => void handleRowEdit(contact, "name", event.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <span className={`status-chip ${contact.status}`}>{contact.status}</span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3}>No contacts loaded yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </article>
 
       <div className="split-grid">
@@ -437,11 +511,15 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
             </div>
             <div className="checklist-row">
               <span>Saved template</span>
-              <strong>{templateName || "No message saved yet"}</strong>
+              <strong>{hasSavedMessage ? draft.draftMessageName || "Saved draft message" : "No saved message yet"}</strong>
             </div>
           </div>
 
-          <HostedSendActions templateName={templateName} />
+          <HostedSendActions
+            canStartCampaign={counts.ready > 0 && hasSavedMessage}
+            readyCount={counts.ready}
+            templateName={draft.draftMessageName || templateName}
+          />
           <p className="quiet-note">
             Use the login check first if anything looks off, then send a live test before the full campaign run.
           </p>

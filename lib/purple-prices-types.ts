@@ -33,6 +33,7 @@ export type CampaignDraft = {
 
 export type SavedTemplate = {
   id: string;
+  campaignName: string;
   name: string;
   updatedAt: string;
   message: CampaignMessage;

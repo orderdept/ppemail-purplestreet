@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { getConvexCampaignDraft, getConvexSuppressions, getConvexTemplates } from "./convex-server";
+import {
+  getConvexCampaignDraft,
+  getConvexCampaigns,
+  getConvexSuppressions,
+  getConvexTemplatesForCampaign,
+} from "./convex-server";
 import { type CampaignDraft, type SavedTemplate } from "./purple-prices-types";
 
 type CampaignResult = {
@@ -147,24 +152,52 @@ function summarizeDraft(draft: CampaignDraft, suppressions: string[]): DraftSnap
 }
 
 export async function getPurplePricesData() {
-  const [fileSuppressions, fileTemplates, campaignSummary, liveSuppressions, liveTemplates, liveDraft] = await Promise.all([
+  const [fileSuppressions, fileTemplates, campaignSummary, liveSuppressions, liveDraft, liveCampaigns] = await Promise.all([
     readJson<string[]>("suppressions.json"),
     readJson<SavedTemplate[]>("templates.json"),
     readJson<CampaignSummary>("campaign-summary.json"),
     getConvexSuppressions(),
-    getConvexTemplates(),
     getConvexCampaignDraft(),
+    getConvexCampaigns(),
   ]);
   const suppressions =
     liveSuppressions && liveSuppressions.length > 0
       ? liveSuppressions.map((row) => row.email).sort((left, right) => left.localeCompare(right))
       : fileSuppressions;
-  const templates = liveTemplates && liveTemplates.length > 0 ? liveTemplates : fileTemplates;
-  const latestCampaign = campaignSummary.latestCampaign || null;
+  const fileHistory = campaignSummary.campaignHistory || [];
+  const liveHistory = (liveCampaigns || [])
+    .map((row) => ({
+      id: String(row._id),
+      status: row.status,
+      subject: row.subject,
+      total: row.totalRecipients,
+      sent: row.sentCount,
+      failed: row.failedCount,
+      createdAt: row.updatedAt,
+      completedAt: row.completedAt || null,
+      previewText: "",
+      recentLog: row.recentLog || [],
+      recentFailures: row.recentFailures || [],
+      smtp: {
+        fromName: row.smtpFromName,
+        username: row.smtpUsername,
+      },
+      dailyLimit: row.dailyLimit,
+      intervalMs: row.intervalMs,
+      currentBatch: row.currentBatch,
+      totalBatches: row.totalBatches,
+    }))
+    .sort((left, right) => (right.completedAt || right.createdAt || "").localeCompare(left.completedAt || left.createdAt || ""));
+  const latestCampaign = liveHistory[0] || campaignSummary.latestCampaign || null;
+  const draft = liveDraft || draftFromCampaign(latestCampaign);
+  const liveTemplates = await getConvexTemplatesForCampaign(draft.campaignName);
+  const templates =
+    liveTemplates && liveTemplates.length > 0
+      ? liveTemplates
+      : fileTemplates.filter((template) => !template.campaignName || template.campaignName === draft.campaignName);
   const latestTemplate = sortNewest(templates as Array<SavedTemplate & { createdAt?: string }>)[0] || null;
   const recentLog = [...(latestCampaign?.recentLog || [])].reverse();
   const recentFailures = [...(latestCampaign?.recentFailures || [])].reverse();
-  const draft = liveDraft || draftFromCampaign(latestCampaign);
   const currentDraftCampaign = summarizeDraft(draft, suppressions);
 
   return {
@@ -180,7 +213,7 @@ export async function getPurplePricesData() {
     draft,
     suppressions,
     templates,
-    campaigns: campaignSummary.campaignHistory || [],
+    campaigns: liveHistory.length ? liveHistory : fileHistory,
     recentLog,
     recentFailures,
     suppressionDownloads: {

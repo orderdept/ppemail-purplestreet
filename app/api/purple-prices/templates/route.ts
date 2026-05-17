@@ -17,12 +17,17 @@ function parseMessage(value: unknown): CampaignMessage {
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as {
+      campaignName?: string;
       name?: string;
       message?: CampaignMessage;
     };
+    const campaignName = String(payload.campaignName || "").trim();
     const name = String(payload.name || "").trim();
     const message = parseMessage(payload.message);
 
+    if (!campaignName) {
+      return NextResponse.json({ error: "Campaign name is required." }, { status: 400 });
+    }
     if (!name) {
       return NextResponse.json({ error: "Template name is required." }, { status: 400 });
     }
@@ -33,7 +38,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await upsertConvexTemplate(name, message);
+    const result = await upsertConvexTemplate(campaignName, name, message);
     revalidatePath("/");
     revalidatePath("/purple-prices-email");
     return NextResponse.json({
@@ -52,12 +57,16 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const campaignName = String(searchParams.get("campaignName") || "").trim();
     const name = String(searchParams.get("name") || "").trim();
+    if (!campaignName) {
+      return NextResponse.json({ error: "Campaign name is required." }, { status: 400 });
+    }
     if (!name) {
       return NextResponse.json({ error: "Template name is required." }, { status: 400 });
     }
 
-    const result = await deleteConvexTemplate(name);
+    const result = await deleteConvexTemplate(campaignName, name);
     revalidatePath("/");
     revalidatePath("/purple-prices-email");
     return NextResponse.json({ ok: true, deleted: result.deleted });

@@ -130,6 +130,7 @@ export function TemplateManager({ draft, templates }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          campaignName: draft.campaignName,
           name,
           message: { subject, previewText, body, mailingAddress },
         }),
@@ -159,7 +160,7 @@ export function TemplateManager({ draft, templates }: Props) {
     setStatus(`Deleting "${name}"...`);
     try {
       const response = await fetch(
-        `/api/purple-prices/templates?name=${encodeURIComponent(name)}`,
+        `/api/purple-prices/templates?campaignName=${encodeURIComponent(draft.campaignName)}&name=${encodeURIComponent(name)}`,
         { method: "DELETE" },
       );
       const data = (await response.json()) as { error?: string; deleted?: boolean };
@@ -205,7 +206,7 @@ export function TemplateManager({ draft, templates }: Props) {
         <div>
           <p className="section-step">Step 1</p>
           <h2>Shape the message</h2>
-          <p>Keep reusable campaign copy here so subject, preview text, body, and footer stay in sync.</p>
+          <p>Keep reusable campaign copy here so subject, preview text, body, and footer stay in sync for this campaign only.</p>
         </div>
       </div>
 

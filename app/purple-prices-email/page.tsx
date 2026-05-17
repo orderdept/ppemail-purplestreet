@@ -116,7 +116,7 @@ export default async function PurplePricesEmailPage() {
       <CampaignWorkspace
         draft={data.draft}
         suppressions={data.suppressions}
-        templateName={template?.name || null}
+        templateName={data.draft.draftMessageName || template?.name || null}
       />
 
       <section className="content-grid">
