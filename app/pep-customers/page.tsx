@@ -336,15 +336,19 @@ export default function PepCustomersPage() {
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
   const profit = orders.reduce((sum, order) => sum + order.profit, 0);
+  const latestOrderGroup = useMemo(
+    () => orders.reduce((latest, order) => Math.max(latest, orderGroupNumber(order.orderGroup) || 0), 0),
+    [orders]
+  );
   const exportRange = useMemo(() => {
     const start = orderGroupNumber(exportStartOrderId);
-    const end = orderGroupNumber(exportEndOrderId);
-    if (start === null || end === null) return null;
+    const end = orderGroupNumber(exportEndOrderId) || latestOrderGroup;
+    if (start === null || !end) return null;
     return {
       start: Math.min(start, end),
       end: Math.max(start, end),
     };
-  }, [exportEndOrderId, exportStartOrderId]);
+  }, [exportEndOrderId, exportStartOrderId, latestOrderGroup]);
   const exportSource = useMemo(() => {
     if (exportRange) {
       return orders.filter((order) => {
@@ -372,6 +376,11 @@ export default function PepCustomersPage() {
     : selected.size
       ? `${selected.size} selected order line${selected.size === 1 ? "" : "s"}`
       : `${filteredOrders.length} visible order line${filteredOrders.length === 1 ? "" : "s"} from the Orders tab`;
+
+  useEffect(() => {
+    if (orderGroupNumber(exportStartOrderId) === null || exportEndOrderId.trim() || !latestOrderGroup) return;
+    setExportEndOrderId(String(latestOrderGroup).padStart(5, "0"));
+  }, [exportEndOrderId, exportStartOrderId, latestOrderGroup]);
 
   useEffect(() => {
     let ignore = false;
@@ -652,7 +661,6 @@ export default function PepCustomersPage() {
                 inputMode="numeric"
                 maxLength={12}
                 onChange={(event) => setExportStartOrderId(event.target.value)}
-                placeholder="30468"
                 value={exportStartOrderId}
               />
             </label>
@@ -662,7 +670,6 @@ export default function PepCustomersPage() {
                 inputMode="numeric"
                 maxLength={12}
                 onChange={(event) => setExportEndOrderId(event.target.value)}
-                placeholder="30525"
                 value={exportEndOrderId}
               />
             </label>
