@@ -10,6 +10,7 @@ type OrderRow = {
   orderGroup: string;
   orderDate: string;
   sku: string;
+  productName: string;
   brand: string;
   qty: number;
   cost: number;
@@ -29,12 +30,20 @@ type OrderRow = {
   customerId: string;
 };
 
+type OrderItem = {
+  orderId: string;
+  productName: string;
+  qty: number;
+  sku: string;
+};
+
 type CustomerRow = OrderRow & {
   orderGroups: Set<string>;
   lineCount: number;
   revenue: number;
   totalProfit: number;
   lastOrder: string;
+  items: OrderItem[];
 };
 
 const requiredColumns = {
@@ -57,7 +66,13 @@ const requiredColumns = {
   customerId: ["customer_id", "customerid"],
 } as const;
 
+const optionalColumns = {
+  productName: ["product_name", "product", "item_name", "item"],
+  ingredient: ["ingredient"],
+} as const;
+
 type ColumnKey = keyof typeof requiredColumns;
+type OptionalColumnKey = keyof typeof optionalColumns;
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -122,11 +137,13 @@ function dateSearchText(value: string) {
   return `${value} ${Number(month)}/${Number(day)}/${year} ${Number(month)}/${Number(day)}/${year.slice(2)}`;
 }
 
-function addressLabel(order: OrderRow) {
+function addressLabel(order: OrderRow | CustomerRow) {
   const cityStateZip = [[order.city, order.state].filter(Boolean).join(", "), order.zipcode]
     .filter(Boolean)
     .join(" ");
-  return [order.customerName, order.company, order.address, order.address2, cityStateZip, order.country]
+  const items: OrderItem[] = "items" in order ? order.items : [order];
+  const itemLines = items.map((item) => `Qty ${item.qty || 0} - ${item.productName || item.sku}`);
+  return [order.customerName, order.company, order.address, order.address2, cityStateZip, ...itemLines]
     .map(cleanText)
     .filter(Boolean)
     .join("\n");
@@ -142,7 +159,22 @@ function findColumns(headers: unknown[]) {
   ) as Record<ColumnKey, number>;
 }
 
+function findOptionalColumns(headers: unknown[]) {
+  const normalized = headers.map(normalizeHeader);
+  return Object.fromEntries(
+    Object.entries(optionalColumns).map(([field, candidates]) => [
+      field,
+      normalized.findIndex((header) => (candidates as readonly string[]).includes(header)),
+    ])
+  ) as Record<OptionalColumnKey, number>;
+}
+
 function cell(row: unknown[], columns: Record<ColumnKey, number>, key: ColumnKey) {
+  const index = columns[key];
+  return index >= 0 ? row[index] : "";
+}
+
+function optionalCell(row: unknown[], columns: Record<OptionalColumnKey, number>, key: OptionalColumnKey) {
   const index = columns[key];
   return index >= 0 ? row[index] : "";
 }
@@ -152,6 +184,7 @@ function importOrders(rows: unknown[][]) {
   if (headerIndex < 0) throw new Error("Could not find an Order ID header row in the first sheet.");
 
   const columns = findColumns(rows[headerIndex]);
+  const optional = findOptionalColumns(rows[headerIndex]);
   const missing = Object.entries(columns)
     .filter(([, index]) => index < 0)
     .map(([field]) => field);
@@ -171,6 +204,11 @@ function importOrders(rows: unknown[][]) {
         orderGroup: orderGroup(orderId),
         orderDate: formatDate(cell(row, columns, "orderDate")),
         sku: cleanText(cell(row, columns, "sku")),
+        productName:
+          cleanText(optionalCell(row, optional, "productName")) ||
+          cleanText(optionalCell(row, optional, "ingredient")) ||
+          cleanText(cell(row, columns, "brand")) ||
+          cleanText(cell(row, columns, "sku")),
         brand: glpBrand(cell(row, columns, "brand")),
         qty: Number(cell(row, columns, "qty")) || 0,
         cost,
@@ -206,12 +244,19 @@ function customerGroups(orders: OrderRow[]) {
         revenue: 0,
         totalProfit: 0,
         lastOrder: "",
+        items: [],
       } satisfies CustomerRow);
     existing.orderGroups.add(order.orderGroup);
     existing.lineCount += 1;
     existing.revenue += order.price;
     existing.totalProfit += order.profit;
     existing.lastOrder = [existing.lastOrder, order.orderDate].sort().at(-1) || order.orderDate;
+    existing.items.push({
+      orderId: order.orderId,
+      productName: order.productName,
+      qty: order.qty,
+      sku: order.sku,
+    });
     groups.set(key, existing);
   });
   return Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue);
