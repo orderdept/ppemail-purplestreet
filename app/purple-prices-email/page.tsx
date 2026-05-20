@@ -6,8 +6,6 @@ import {
   formatRate,
   getPurplePricesData,
 } from "../../lib/purple-prices-data";
-import { ImportBouncesButton } from "./import-bounces-button";
-import { SuppressionSearch } from "./suppression-search";
 import { WorkflowTabs } from "./workflow-tabs";
 
 export const dynamic = "force-dynamic";
@@ -108,109 +106,14 @@ export default async function PurplePricesEmailPage() {
 
       <WorkflowTabs
         campaigns={data.campaigns}
+        currentCampaign={campaign}
         draft={data.draft}
+        latestCampaign={latestCampaign}
+        recentFailures={data.recentFailures}
+        recentLog={data.recentLog}
         suppressions={data.suppressions}
         templates={data.templates}
       />
-
-      <section className="content-grid">
-        <article className="panel wide">
-          <div className="module-row">
-            <div>
-              <p className="section-step">Campaign snapshot</p>
-              <h2>Draft readiness at a glance</h2>
-              <p>Use this to sanity-check the campaign you are building before you send it.</p>
-            </div>
-          </div>
-
-          <div className="detail-grid">
-            <div className="detail-item">
-              <span>Total recipients</span>
-              <strong>{compactNumber(campaign?.total)}</strong>
-            </div>
-            <div className="detail-item">
-              <span>Remaining</span>
-              <strong>{compactNumber(remaining)}</strong>
-            </div>
-            <div className="detail-item">
-              <span>Daily limit</span>
-              <strong>{compactNumber(campaign?.dailyLimit)}</strong>
-            </div>
-            <div className="detail-item">
-              <span>Send rate</span>
-              <strong>{formatRate(campaign?.intervalMs)}</strong>
-            </div>
-            <div className="detail-item">
-              <span>Batches</span>
-              <strong>
-                {campaign?.currentBatch || 0}/{campaign?.totalBatches || 0}
-              </strong>
-            </div>
-            <div className="detail-item">
-              <span>Last completed send</span>
-              <strong>{formatDateTime(latestCampaign?.completedAt)}</strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="panel">
-          <p className="section-step">List hygiene</p>
-          <h2>Suppressions</h2>
-          <p>{compactNumber(data.suppressions.length)} addresses are excluded from future sends.</p>
-          <div className="button-row">
-            <ImportBouncesButton
-              campaignSubject={latestCampaign?.subject || ""}
-              smtpUsername={data.draft.smtpUsername}
-            />
-          </div>
-          <div className="button-row">
-            <a className="action-link" href="/api/purple-prices/suppressions/export.csv">
-              Download CSV
-            </a>
-            <a className="action-link ghost" href="/api/purple-prices/suppressions/export.json">
-              Download JSON
-            </a>
-          </div>
-          <SuppressionSearch suppressions={data.suppressions} />
-        </article>
-
-        <article className="panel">
-          <p className="section-step">Delivery watch</p>
-          <h2>Recent failed deliveries</h2>
-          {data.recentFailures.length ? (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Email</th>
-                    <th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentFailures.map((row) => (
-                    <tr key={`${row.email}-${row.recordedAt || row.error}`}>
-                      <td>{row.email}</td>
-                      <td>{row.error || "Delivery failed"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p>No recent failed deliveries recorded.</p>
-          )}
-        </article>
-
-        <article className="panel">
-          <p className="section-step">Activity</p>
-          <h2>Recent send log</h2>
-          <ul className="activity-list">
-            {data.recentLog.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </article>
-      </section>
     </main>
   );
 }
