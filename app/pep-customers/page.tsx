@@ -130,6 +130,10 @@ function glpBrand(value: unknown) {
   return cleanText(value).match(/\bGLP-\d+\b/i)?.[0].toUpperCase() || cleanText(value);
 }
 
+function productLabel(value: unknown) {
+  return glpBrand(value) || cleanText(value);
+}
+
 function dateSearchText(value: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return value;
@@ -142,7 +146,12 @@ function addressLabel(order: OrderRow | CustomerRow) {
     .filter(Boolean)
     .join(" ");
   const items: OrderItem[] = "items" in order ? order.items : [order];
-  const itemLines = items.map((item) => `Qty ${item.qty || 0} - ${item.productName || item.sku}`);
+  const itemTotals = new Map<string, number>();
+  items.forEach((item) => {
+    const label = productLabel(item.productName || item.sku);
+    itemTotals.set(label, (itemTotals.get(label) || 0) + (item.qty || 0));
+  });
+  const itemLines = Array.from(itemTotals.entries()).map(([label, qty]) => `Qty ${qty} - ${label}`);
   return [order.customerName, order.company, order.address, order.address2, cityStateZip, ...itemLines]
     .map(cleanText)
     .filter(Boolean)
@@ -205,9 +214,11 @@ function importOrders(rows: unknown[][]) {
         orderDate: formatDate(cell(row, columns, "orderDate")),
         sku: cleanText(cell(row, columns, "sku")),
         productName:
-          cleanText(optionalCell(row, optional, "productName")) ||
-          cleanText(optionalCell(row, optional, "ingredient")) ||
-          cleanText(cell(row, columns, "brand")) ||
+          productLabel(
+            cleanText(optionalCell(row, optional, "productName")) ||
+              cleanText(optionalCell(row, optional, "ingredient")) ||
+              cleanText(cell(row, columns, "brand"))
+          ) ||
           cleanText(cell(row, columns, "sku")),
         brand: glpBrand(cell(row, columns, "brand")),
         qty: Number(cell(row, columns, "qty")) || 0,
