@@ -6,11 +6,9 @@ import {
   formatRate,
   getPurplePricesData,
 } from "../../lib/purple-prices-data";
-import { CampaignWorkspace } from "./campaign-workspace";
-import { CampaignDesk } from "./campaign-desk";
 import { ImportBouncesButton } from "./import-bounces-button";
 import { SuppressionSearch } from "./suppression-search";
-import { TemplateManager } from "./template-manager";
+import { WorkflowTabs } from "./workflow-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -108,14 +106,11 @@ export default async function PurplePricesEmailPage() {
         </article>
       </section>
 
-      <CampaignDesk draft={data.draft} campaigns={data.campaigns} />
-
-      <TemplateManager draft={data.draft} templates={data.templates} />
-
-      <CampaignWorkspace
+      <WorkflowTabs
+        campaigns={data.campaigns}
         draft={data.draft}
         suppressions={data.suppressions}
-        templateName={data.draft.draftMessageName || null}
+        templates={data.templates}
       />
 
       <section className="content-grid">

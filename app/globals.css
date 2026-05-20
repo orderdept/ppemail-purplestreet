@@ -236,6 +236,23 @@ h1 {
   margin-bottom: 16px;
 }
 
+.workflow-tab-shell {
+  margin-bottom: 16px;
+}
+
+.workflow-tab-row {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin: 0 0 16px;
+  padding: 10px 12px;
+}
+
+.tab-panel {
+  min-width: 0;
+}
+
 .campaign-desk {
   margin-bottom: 16px;
 }

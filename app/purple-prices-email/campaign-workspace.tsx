@@ -7,6 +7,7 @@ import { type CampaignContact, type CampaignDraft } from "../../lib/purple-price
 import { HostedSendActions } from "./hosted-send-actions";
 
 type Props = {
+  activeStep?: "audience" | "delivery" | "final";
   draft: CampaignDraft;
   suppressions: string[];
   templateName?: string | null;
@@ -154,7 +155,12 @@ function formatDraftCompletion(readyCount: number, spacing: number) {
   return new Date(Date.now() + Math.max(0, readyCount - 1) * spacing).toLocaleString();
 }
 
-export function CampaignWorkspace({ draft: initialDraft, suppressions, templateName }: Props) {
+export function CampaignWorkspace({
+  activeStep = "audience",
+  draft: initialDraft,
+  suppressions,
+  templateName,
+}: Props) {
   const [draft, setDraft] = useState<CampaignDraft>(initialDraft);
   const [csvContacts, setCsvContacts] = useState<CampaignContact[]>(initialDraft.csvContacts);
   const [typedContacts, setTypedContacts] = useState<CampaignContact[]>(initialDraft.typedContacts);
@@ -389,6 +395,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
 
   return (
     <section className="workflow-stack">
+      {activeStep === "audience" ? (
       <article className="panel wide">
         <div className="section-head">
           <div>
@@ -516,8 +523,9 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
           </div>
         </details>
       </article>
+      ) : null}
 
-      <div className="split-grid">
+      {activeStep === "delivery" ? (
         <article className="panel">
           <div className="section-head">
             <div>
@@ -627,7 +635,9 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
           <small className="template-status">{deliveryStatus}</small>
           <small className="template-status">{keychainStatus}</small>
         </article>
+      ) : null}
 
+      {activeStep === "final" ? (
         <article className="panel">
           <div className="section-head">
             <div>
@@ -664,7 +674,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
             templateName={templateName}
           />
         </article>
-      </div>
+      ) : null}
     </section>
   );
 }
