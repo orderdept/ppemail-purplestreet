@@ -138,7 +138,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   const [csvContacts, setCsvContacts] = useState<CampaignContact[]>(initialDraft.csvContacts);
   const [typedContacts, setTypedContacts] = useState<CampaignContact[]>(initialDraft.typedContacts);
   const [pasteText, setPasteText] = useState(initialDraft.pasteText);
-  const [csvMode, setCsvMode] = useState<"replace" | "add">("replace");
+  const [csvMode, setCsvMode] = useState<"replace" | "add" | "exclusive">("replace");
   const [showAudiencePreview, setShowAudiencePreview] = useState(false);
   const [smtpPassword, setSmtpPassword] = useState("");
   const [keychainStatus, setKeychainStatus] = useState("Checking Mac Keychain...");
@@ -233,9 +233,13 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
     if (!file) return;
     const parsedContacts = contactsFromCsv(await file.text());
     const nextCsvContacts = csvMode === "add" ? [...csvContacts, ...parsedContacts] : parsedContacts;
+    const nextTypedContacts = csvMode === "exclusive" ? [] : typedContacts;
+    const nextPasteText = csvMode === "exclusive" ? "" : pasteText;
     setCsvContacts(nextCsvContacts);
+    setTypedContacts(nextTypedContacts);
+    setPasteText(nextPasteText);
     setShowAudiencePreview(true);
-    await saveSetup(draft, nextCsvContacts, typedContacts, pasteText);
+    await saveSetup(draft, nextCsvContacts, nextTypedContacts, nextPasteText);
   }
 
   async function handlePasteChange(value: string) {
@@ -408,6 +412,10 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
                 <input checked={csvMode === "add"} onChange={() => setCsvMode("add")} type="checkbox" />
                 <span>Add to existing uploaded list</span>
               </label>
+              <label className="choice-option">
+                <input checked={csvMode === "exclusive"} onChange={() => setCsvMode("exclusive")} type="checkbox" />
+                <span>Use only this list for this campaign</span>
+              </label>
             </div>
           </div>
           <label className="field">
@@ -425,7 +433,11 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
           </label>
         </div>
 
-        <small className="template-status">{saveStatus}</small>
+        <small className="template-status">
+          {csvMode === "exclusive"
+            ? "Uploading a CSV in this mode clears pasted addresses and uses only that uploaded campaign list, while still honoring the shared suppression list."
+            : saveStatus}
+        </small>
 
         <details className="audience-preview top-gap" open={showAudiencePreview}>
           <summary onClick={() => setShowAudiencePreview((current) => !current)}>
