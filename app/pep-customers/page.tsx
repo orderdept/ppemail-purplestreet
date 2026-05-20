@@ -128,6 +128,11 @@ function orderGroup(orderId: string) {
   return orderId.match(/^(\d{5})/)?.[1] || orderId.slice(0, 5);
 }
 
+function orderGroupNumber(value: string) {
+  const match = cleanText(value).match(/^(\d{5})/);
+  return match ? Number(match[1]) : null;
+}
+
 function glpBrand(value: unknown) {
   return cleanText(value).match(/\bGLP-\d+\b/i)?.[0].toUpperCase() || cleanText(value);
 }
@@ -305,6 +310,8 @@ export default function PepCustomersPage() {
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
+  const [exportStartOrderId, setExportStartOrderId] = useState("");
+  const [exportEndOrderId, setExportEndOrderId] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
@@ -329,10 +336,27 @@ export default function PepCustomersPage() {
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
   const profit = orders.reduce((sum, order) => sum + order.profit, 0);
+  const exportRange = useMemo(() => {
+    const start = orderGroupNumber(exportStartOrderId);
+    const end = orderGroupNumber(exportEndOrderId);
+    if (start === null || end === null) return null;
+    return {
+      start: Math.min(start, end),
+      end: Math.max(start, end),
+    };
+  }, [exportEndOrderId, exportStartOrderId]);
+  const exportSource = useMemo(() => {
+    if (exportRange) {
+      return orders.filter((order) => {
+        const groupNumber = orderGroupNumber(order.orderGroup);
+        return groupNumber !== null && groupNumber >= exportRange.start && groupNumber <= exportRange.end;
+      });
+    }
+    return selected.size ? orders.filter((order) => selected.has(order.id)) : filteredOrders;
+  }, [exportRange, filteredOrders, orders, selected]);
   const exportCustomers = useMemo(() => {
-    const source = selected.size ? orders.filter((order) => selected.has(order.id)) : filteredOrders;
     const rows = new Map<string, { firstName: string; email: string; customerName: string; customerId: string }>();
-    source.forEach((order) => {
+    exportSource.forEach((order) => {
       if (!order.email || rows.has(order.email)) return;
       rows.set(order.email, {
         firstName: order.firstName,
@@ -342,7 +366,12 @@ export default function PepCustomersPage() {
       });
     });
     return Array.from(rows.values()).sort((a, b) => a.email.localeCompare(b.email));
-  }, [filteredOrders, orders, selected]);
+  }, [exportSource]);
+  const exportScopeText = exportRange
+    ? `${exportSource.length} order line${exportSource.length === 1 ? "" : "s"} from order IDs ${String(exportRange.start).padStart(5, "0")} through ${String(exportRange.end).padStart(5, "0")}`
+    : selected.size
+      ? `${selected.size} selected order line${selected.size === 1 ? "" : "s"}`
+      : `${filteredOrders.length} visible order line${filteredOrders.length === 1 ? "" : "s"} from the Orders tab`;
 
   useEffect(() => {
     let ignore = false;
@@ -600,7 +629,7 @@ export default function PepCustomersPage() {
             <div>
               <p className="section-step">Export</p>
               <h2>Customer List</h2>
-              <p>Downloads first name and email from selected orders. If nothing is selected, it uses the visible orders.</p>
+              <p>Downloads first name and email from an order ID range, selected orders, or the visible Orders tab results.</p>
             </div>
             <div className="page-top-actions">
               <button className="action-button" type="button" onClick={() => downloadCsv(exportCustomers)}>Download CSV</button>
@@ -616,8 +645,31 @@ export default function PepCustomersPage() {
               </button>
             </div>
           </div>
+          <div className="host-form-grid">
+            <label className="field">
+              <span>Beginning order ID</span>
+              <input
+                inputMode="numeric"
+                maxLength={12}
+                onChange={(event) => setExportStartOrderId(event.target.value)}
+                placeholder="30468"
+                value={exportStartOrderId}
+              />
+            </label>
+            <label className="field">
+              <span>Ending order ID</span>
+              <input
+                inputMode="numeric"
+                maxLength={12}
+                onChange={(event) => setExportEndOrderId(event.target.value)}
+                placeholder="30525"
+                value={exportEndOrderId}
+              />
+            </label>
+          </div>
+          <small className="inline-status">Export is using {exportScopeText}.</small>
           {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
-          <pre className="log-box">{exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
+          <pre className="log-box top-gap">{exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
         </section>
       ) : null}
     </main>
