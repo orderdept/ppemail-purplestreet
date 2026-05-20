@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
 type OrderRow = {
@@ -73,6 +73,7 @@ const optionalColumns = {
 
 type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
+type TabKey = "customers" | "orders" | "import" | "export";
 const savedOrdersKey = "pep-customers-orders-v1";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
@@ -243,22 +244,6 @@ function importOrders(rows: unknown[][]) {
     .filter((order): order is OrderRow => Boolean(order));
 }
 
-function mergeOrders(existing: OrderRow[], incoming: OrderRow[]) {
-  const byOrderId = new Map(existing.map((order) => [order.orderId, order]));
-  let added = 0;
-  let updated = 0;
-  incoming.forEach((order) => {
-    if (byOrderId.has(order.orderId)) updated += 1;
-    else added += 1;
-    byOrderId.set(order.orderId, order);
-  });
-  const orders = Array.from(byOrderId.values()).sort((a, b) => {
-    const dateCompare = a.orderDate.localeCompare(b.orderDate);
-    return dateCompare || a.orderId.localeCompare(b.orderId, undefined, { numeric: true });
-  });
-  return { orders, added, updated };
-}
-
 function customerGroups(orders: OrderRow[]) {
   const groups = new Map<string, CustomerRow>();
   orders.forEach((order) => {
@@ -314,10 +299,9 @@ function downloadCsv(rows: Array<{ firstName: string; email: string; customerNam
 
 export default function PepCustomersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
-  const ordersRef = useRef<OrderRow[]>([]);
-  const [restored, setRestored] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>("customers");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState("No order file loaded");
+  const [status, setStatus] = useState("Loading saved orders...");
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
@@ -361,25 +345,58 @@ export default function PepCustomersPage() {
   }, [filteredOrders, orders, selected]);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(savedOrdersKey) || "[]") as OrderRow[];
-      if (Array.isArray(saved) && saved.length) {
-        ordersRef.current = saved;
-        setOrders(saved);
-        setStatus(`Loaded ${saved.length} saved order lines`);
-      }
-    } catch {
-      setStatus("Saved order data could not be loaded.");
-    } finally {
-      setRestored(true);
-    }
-  }, []);
+    let ignore = false;
 
-  useEffect(() => {
-    ordersRef.current = orders;
-    if (!restored) return;
-    window.localStorage.setItem(savedOrdersKey, JSON.stringify(orders));
-  }, [orders, restored]);
+    async function loadOrders() {
+      try {
+        const response = await fetch("/api/pep-customers/orders", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || "Could not load saved orders.");
+
+        let saved = Array.isArray(data.orders) ? (data.orders as OrderRow[]) : [];
+        let migrated = false;
+
+        if (!saved.length) {
+          const localRows = JSON.parse(window.localStorage.getItem(savedOrdersKey) || "[]") as OrderRow[];
+          if (Array.isArray(localRows) && localRows.length) {
+            const migration = await fetch("/api/pep-customers/orders", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orders: localRows, sourceFile: "Browser saved orders" }),
+            });
+            const migrationData = await migration.json();
+            if (migration.ok) {
+              saved = Array.isArray(migrationData.orders) ? migrationData.orders : localRows;
+              migrated = true;
+              window.localStorage.removeItem(savedOrdersKey);
+              if (!ignore) setStatus(`Moved ${saved.length} saved order lines into the server database.`);
+            }
+          }
+        }
+
+        if (!ignore) {
+          setOrders(saved);
+          if (migrated) {
+            setStatus(`Moved ${saved.length} saved order lines into the server database.`);
+          } else if (saved.length) {
+            setStatus(`Loaded ${saved.length} saved order lines from the server database.`);
+          } else if (!saved.length) {
+            setStatus("No saved orders yet. Import an order spreadsheet to begin.");
+          }
+        }
+      } catch (error) {
+        if (!ignore) {
+          setStatus(error instanceof Error ? error.message : "Could not load saved orders.");
+        }
+      }
+    }
+
+    void loadOrders();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   async function handleFile(file: File) {
     setStatus("Reading order file...");
@@ -388,11 +405,19 @@ export default function PepCustomersPage() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: true });
       const imported = importOrders(rows);
-      const merged = mergeOrders(ordersRef.current, imported);
-      ordersRef.current = merged.orders;
-      setOrders(merged.orders);
+      setStatus(`Saving ${imported.length} order lines from ${file.name}...`);
+      const response = await fetch("/api/pep-customers/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: imported, sourceFile: file.name }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Could not save that order file.");
+
+      setOrders(Array.isArray(data.orders) ? data.orders : imported);
       setSelected(new Set());
-      setStatus(`Added ${merged.added} new order lines and updated ${merged.updated} existing lines from ${file.name}.`);
+      setActiveTab("orders");
+      setStatus(`Saved ${file.name}: ${data.added ?? 0} new order lines and ${data.updated ?? 0} updated lines.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not import that order file.");
     }
@@ -412,6 +437,13 @@ export default function PepCustomersPage() {
     await navigator.clipboard.writeText(label);
     setCopyStatus(`Copied address for ${order.customerName}.`);
   }
+
+  const tabs: Array<{ key: TabKey; label: string }> = [
+    { key: "customers", label: "Customers" },
+    { key: "orders", label: "Orders" },
+    { key: "import", label: "Import" },
+    { key: "export", label: "Export" },
+  ];
 
   return (
     <main className="shell">
@@ -438,132 +470,156 @@ export default function PepCustomersPage() {
         <div className="stat-card"><span>Export</span><strong>{exportCustomers.length}</strong></div>
       </section>
 
-      <section className="panel top-gap">
-        <div className="section-head">
-          <div>
-            <p className="section-step">Import</p>
-            <h2>Order Spreadsheet</h2>
-            <p>Reads the first sheet and keeps only the requested order, customer, revenue, and address fields.</p>
-          </div>
-          <input className="plain-file-input" type="file" accept=".xlsx,.xls" onChange={(event) => event.target.files?.[0] && void handleFile(event.target.files[0])} />
-        </div>
-      </section>
+      <div className="tab-row" role="tablist" aria-label="Pep Customers sections">
+        {tabs.map((tab) => (
+          <button
+            aria-selected={activeTab === tab.key}
+            className={`tab-button${activeTab === tab.key ? " active" : ""}`}
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            role="tab"
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      <section className="panel top-gap">
-        <div className="section-head">
-          <div>
-            <p className="section-step">Orders</p>
-            <h2>Search And Select</h2>
-            <p>Search by order ID, first 5 digits, last name, Customer ID, email address, or order date.</p>
+      {activeTab === "customers" ? (
+        <section className="panel top-gap">
+          <div className="section-head">
+            <div>
+              <p className="section-step">Customers</p>
+              <h2>Order History</h2>
+              <p>Customer rollups combine order lines by Customer ID first, then email if the ID is missing.</p>
+            </div>
           </div>
-          <div className="page-top-actions">
-            <button className="action-button" type="button" onClick={() => setSelected(new Set(filteredOrders.map((order) => order.id)))}>Select visible</button>
-            <button className="action-button ghost" type="button" onClick={() => setSelected(new Set())}>Clear selection</button>
-          </div>
-        </div>
-        <div className="host-form-grid">
-          <label className="field">
-            <span>Search orders</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="30468, 30468-A1, Chesney, 3161, email, or 5/13/26" />
-          </label>
-          <label className="field">
-            <span>Brand</span>
-            <select value={brand} onChange={(event) => setBrand(event.target.value)}>
-              <option value="">All GLP brands</option>
-              {brands.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <label className="field">
-            <span>Order date</span>
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          </label>
-        </div>
-        <div className="table-wrap top-gap">
-          <table className="data-table ops-table">
-            <thead>
-              <tr>
-                <th>Select</th><th>Order ID</th><th>Date</th><th>Brand</th><th>Qty</th><th>Cost</th><th>Price</th><th>Profit</th><th>Customer</th><th>Email</th><th>Customer ID</th><th>Address</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length ? filteredOrders.map((order) => (
-                <tr key={order.id}>
-                  <td><input type="checkbox" checked={selected.has(order.id)} onChange={(event) => toggleSelected(order.id, event.target.checked)} /></td>
-                  <td><strong>{order.orderId}</strong><br /><small>{order.orderGroup}</small></td>
-                  <td>{order.orderDate}</td>
-                  <td><span className="status-chip ready">{order.brand}</span></td>
-                  <td>{order.qty}</td>
-                  <td>{moneyFormatter.format(order.cost)}</td>
-                  <td>{moneyFormatter.format(order.price)}</td>
-                  <td>{moneyFormatter.format(order.profit)}</td>
-                  <td>{order.customerName}<br /><small>{order.firstName}</small></td>
-                  <td>{order.email}</td>
-                  <td>{order.customerId}</td>
-                  <td>{[order.address, order.address2, order.city, order.state, order.zipcode].filter(Boolean).join(", ")}</td>
+          <div className="table-wrap">
+            <table className="data-table ops-table">
+              <thead>
+                <tr>
+                  <th>Customer</th><th>Email</th><th>Customer ID</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Last Order</th><th>Label</th>
                 </tr>
-              )) : <tr><td colSpan={12}>No matching orders.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="panel top-gap">
-        <div className="section-head">
-          <div>
-            <p className="section-step">Customers</p>
-            <h2>Order History</h2>
-            <p>Customer rollups combine order lines by Customer ID first, then email if the ID is missing.</p>
+              </thead>
+              <tbody>
+                {customers.length ? customers.map((customer) => (
+                  <tr key={customer.customerId || customer.email}>
+                    <td><strong>{customer.customerName}</strong><br /><small>{customer.firstName}</small></td>
+                    <td>{customer.email}</td>
+                    <td>{customer.customerId}</td>
+                    <td>{customer.orderGroups.size} orders<br /><small>{Array.from(customer.orderGroups).sort().join(", ")} · {customer.lineCount} lines</small></td>
+                    <td>{moneyFormatter.format(customer.revenue)}</td>
+                    <td>{moneyFormatter.format(customer.totalProfit)}</td>
+                    <td>{customer.lastOrder}</td>
+                    <td><button className="action-button ghost" type="button" onClick={() => void copyAddress(customer)}>Copy address</button></td>
+                  </tr>
+                )) : <tr><td colSpan={8}>No customers imported yet.</td></tr>}
+              </tbody>
+            </table>
           </div>
-        </div>
-        <div className="table-wrap">
-          <table className="data-table ops-table">
-            <thead>
-              <tr>
-                <th>Customer</th><th>Email</th><th>Customer ID</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Last Order</th><th>Label</th>
-              </tr>
-            </thead>
-            <tbody>
-              {customers.length ? customers.map((customer) => (
-                <tr key={customer.customerId || customer.email}>
-                  <td><strong>{customer.customerName}</strong><br /><small>{customer.firstName}</small></td>
-                  <td>{customer.email}</td>
-                  <td>{customer.customerId}</td>
-                  <td>{customer.orderGroups.size} orders<br /><small>{Array.from(customer.orderGroups).sort().join(", ")} · {customer.lineCount} lines</small></td>
-                  <td>{moneyFormatter.format(customer.revenue)}</td>
-                  <td>{moneyFormatter.format(customer.totalProfit)}</td>
-                  <td>{customer.lastOrder}</td>
-                  <td><button className="action-button ghost" type="button" onClick={() => void copyAddress(customer)}>Copy address</button></td>
+          {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
+        </section>
+      ) : null}
+
+      {activeTab === "orders" ? (
+        <section className="panel top-gap">
+          <div className="section-head">
+            <div>
+              <p className="section-step">Orders</p>
+              <h2>Search And Select</h2>
+              <p>Search by order ID, first 5 digits, last name, Customer ID, email address, or order date.</p>
+            </div>
+            <div className="page-top-actions">
+              <button className="action-button" type="button" onClick={() => setSelected(new Set(filteredOrders.map((order) => order.id)))}>Select visible</button>
+              <button className="action-button ghost" type="button" onClick={() => setSelected(new Set())}>Clear selection</button>
+            </div>
+          </div>
+          <div className="host-form-grid">
+            <label className="field">
+              <span>Search orders</span>
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="30468, 30468-A1, Chesney, 3161, email, or 5/13/26" />
+            </label>
+            <label className="field">
+              <span>Brand</span>
+              <select value={brand} onChange={(event) => setBrand(event.target.value)}>
+                <option value="">All GLP brands</option>
+                {brands.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="field">
+              <span>Order date</span>
+              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            </label>
+          </div>
+          <div className="table-wrap top-gap">
+            <table className="data-table ops-table">
+              <thead>
+                <tr>
+                  <th>Select</th><th>Order ID</th><th>Date</th><th>Brand</th><th>Qty</th><th>Cost</th><th>Price</th><th>Profit</th><th>Customer</th><th>Email</th><th>Customer ID</th><th>Address</th>
                 </tr>
-              )) : <tr><td colSpan={8}>No customers imported yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {filteredOrders.length ? filteredOrders.map((order) => (
+                  <tr key={order.id}>
+                    <td><input type="checkbox" checked={selected.has(order.id)} onChange={(event) => toggleSelected(order.id, event.target.checked)} /></td>
+                    <td><strong>{order.orderId}</strong><br /><small>{order.orderGroup}</small></td>
+                    <td>{order.orderDate}</td>
+                    <td><span className="status-chip ready">{order.brand}</span></td>
+                    <td>{order.qty}</td>
+                    <td>{moneyFormatter.format(order.cost)}</td>
+                    <td>{moneyFormatter.format(order.price)}</td>
+                    <td>{moneyFormatter.format(order.profit)}</td>
+                    <td>{order.customerName}<br /><small>{order.firstName}</small></td>
+                    <td>{order.email}</td>
+                    <td>{order.customerId}</td>
+                    <td>{[order.address, order.address2, order.city, order.state, order.zipcode].filter(Boolean).join(", ")}</td>
+                  </tr>
+                )) : <tr><td colSpan={12}>No matching orders.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
-      <section className="panel top-gap">
-        <div className="section-head">
-          <div>
-            <p className="section-step">Export</p>
-            <h2>Customer List</h2>
-            <p>Downloads first name and email from selected orders. If nothing is selected, it uses the visible orders.</p>
+      {activeTab === "import" ? (
+        <section className="panel top-gap">
+          <div className="section-head">
+            <div>
+              <p className="section-step">Import</p>
+              <h2>Order Spreadsheet</h2>
+              <p>Reads the first sheet, saves the requested order fields to the server database, and adds each new upload to the existing order history.</p>
+            </div>
+            <input className="plain-file-input" type="file" accept=".xlsx,.xls" onChange={(event) => event.target.files?.[0] && void handleFile(event.target.files[0])} />
           </div>
-          <div className="page-top-actions">
-            <button className="action-button" type="button" onClick={() => downloadCsv(exportCustomers)}>Download CSV</button>
-            <button
-              className="action-button ghost"
-              type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(exportCustomers.map((row) => row.email).join("\n"));
-                setCopyStatus(`Copied ${exportCustomers.length} email${exportCustomers.length === 1 ? "" : "s"}.`);
-              }}
-            >
-              Copy emails
-            </button>
+        </section>
+      ) : null}
+
+      {activeTab === "export" ? (
+        <section className="panel top-gap">
+          <div className="section-head">
+            <div>
+              <p className="section-step">Export</p>
+              <h2>Customer List</h2>
+              <p>Downloads first name and email from selected orders. If nothing is selected, it uses the visible orders.</p>
+            </div>
+            <div className="page-top-actions">
+              <button className="action-button" type="button" onClick={() => downloadCsv(exportCustomers)}>Download CSV</button>
+              <button
+                className="action-button ghost"
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(exportCustomers.map((row) => row.email).join("\n"));
+                  setCopyStatus(`Copied ${exportCustomers.length} email${exportCustomers.length === 1 ? "" : "s"}.`);
+                }}
+              >
+                Copy emails
+              </button>
+            </div>
           </div>
-        </div>
-        {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
-        <pre className="log-box">{exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
-      </section>
+          {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
+          <pre className="log-box">{exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
+        </section>
+      ) : null}
     </main>
   );
 }

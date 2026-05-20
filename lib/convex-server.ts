@@ -4,6 +4,7 @@ import { api } from "../convex/_generated/api";
 import { type CampaignDraft, type CampaignMessage, type SavedTemplate } from "./purple-prices-types";
 
 export const moduleKey = "purple-prices-email";
+export const pepCustomersModuleKey = "pep-customers";
 
 export type SuppressionSource = "manual" | "bounce" | "unsubscribe" | "import";
 
@@ -196,6 +197,88 @@ export async function recordConvexCampaign(input: {
     moduleKey,
     ...input,
     updatedAt: new Date().toISOString(),
+  });
+}
+
+export type PepCustomerOrder = {
+  id: string;
+  orderId: string;
+  orderGroup: string;
+  orderDate: string;
+  sku: string;
+  productName: string;
+  brand: string;
+  qty: number;
+  cost: number;
+  price: number;
+  profit: number;
+  customerName: string;
+  firstName: string;
+  lastName: string;
+  company: string;
+  address: string;
+  address2: string;
+  city: string;
+  state: string;
+  zipcode: string;
+  country: string;
+  email: string;
+  customerId: string;
+};
+
+type ConvexPepCustomerOrder = Omit<PepCustomerOrder, "id"> & {
+  _id: unknown;
+};
+
+function toPepCustomerOrder(row: ConvexPepCustomerOrder): PepCustomerOrder {
+  return {
+    id: row.orderId,
+    orderId: row.orderId,
+    orderGroup: row.orderGroup,
+    orderDate: row.orderDate,
+    sku: row.sku,
+    productName: row.productName,
+    brand: row.brand,
+    qty: row.qty,
+    cost: row.cost,
+    price: row.price,
+    profit: row.profit,
+    customerName: row.customerName,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    company: row.company,
+    address: row.address,
+    address2: row.address2,
+    city: row.city,
+    state: row.state,
+    zipcode: row.zipcode,
+    country: row.country,
+    email: row.email,
+    customerId: row.customerId,
+  };
+}
+
+export async function getConvexPepCustomerOrders() {
+  const client = getConvexClient();
+  if (!client) {
+    return null;
+  }
+  const rows = (await client.query(api.pepCustomers.listOrders, {
+    moduleKey: pepCustomersModuleKey,
+  })) as ConvexPepCustomerOrder[];
+  return rows.map(toPepCustomerOrder);
+}
+
+export async function upsertConvexPepCustomerOrders(orders: PepCustomerOrder[], sourceFile?: string) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  const payload = orders.map(({ id: _id, ...order }) => order);
+  return await client.mutation(api.pepCustomers.upsertOrders, {
+    moduleKey: pepCustomersModuleKey,
+    sourceFile,
+    orders: payload,
   });
 }
 

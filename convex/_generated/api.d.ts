@@ -11,6 +11,7 @@
 import type * as campaignDrafts from "../campaignDrafts.js";
 import type * as campaigns from "../campaigns.js";
 import type * as modules from "../modules.js";
+import type * as pepCustomers from "../pepCustomers.js";
 import type * as suppressions from "../suppressions.js";
 import type * as templates from "../templates.js";
 
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   campaignDrafts: typeof campaignDrafts;
   campaigns: typeof campaigns;
   modules: typeof modules;
+  pepCustomers: typeof pepCustomers;
   suppressions: typeof suppressions;
   templates: typeof templates;
 }>;
