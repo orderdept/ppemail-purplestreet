@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 
 import { type CampaignContact, type CampaignDraft } from "../../lib/purple-prices-types";
 import { HostedSendActions } from "./hosted-send-actions";
@@ -69,6 +70,10 @@ function csvRows(text: string) {
 
 function contactsFromCsv(text: string) {
   const rows = csvRows(text);
+  return contactsFromRows(rows);
+}
+
+function contactsFromRows(rows: string[][]) {
   if (!rows.length) return [];
 
   const headers = rows[0].map((header) => header.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
@@ -83,6 +88,22 @@ function contactsFromCsv(text: string) {
       return email ? { email, name: name || defaultContactName } : null;
     })
     .filter((item): item is CampaignContact => Boolean(item));
+}
+
+function contactsFromWorkbook(file: File, workbook: XLSX.WorkBook) {
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) {
+    throw new Error(`"${file.name}" does not contain any worksheets.`);
+  }
+  const sheet = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    raw: false,
+    blankrows: false,
+  });
+  return contactsFromRows(
+    rows.map((row) => row.map((value) => String(value || "").trim())),
+  );
 }
 
 function contactsFromPaste(text: string) {
@@ -231,7 +252,11 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   async function handleCsvChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const parsedContacts = contactsFromCsv(await file.text());
+    const lowerName = file.name.toLowerCase();
+    const parsedContacts =
+      lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")
+        ? contactsFromWorkbook(file, XLSX.read(await file.arrayBuffer(), { type: "array" }))
+        : contactsFromCsv(await file.text());
     const nextCsvContacts = csvMode === "add" ? [...csvContacts, ...parsedContacts] : parsedContacts;
     const nextTypedContacts = csvMode === "exclusive" ? [] : typedContacts;
     const nextPasteText = csvMode === "exclusive" ? "" : pasteText;
@@ -419,8 +444,8 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
             </div>
           </div>
           <label className="field">
-            <span>Upload CSV</span>
-            <input className="plain-file-input" ref={fileInputRef} accept=".csv,.txt" onChange={handleCsvChange} type="file" />
+            <span>Upload CSV or Excel</span>
+            <input className="plain-file-input" ref={fileInputRef} accept=".csv,.txt,.xlsx,.xls" onChange={handleCsvChange} type="file" />
           </label>
           <label className="field">
             <span>Paste email addresses</span>
