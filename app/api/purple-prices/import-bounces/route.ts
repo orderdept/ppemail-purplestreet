@@ -5,12 +5,21 @@ import { runPurplePricesBounceImport } from "../../../../lib/purple-prices-impor
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json().catch(() => ({}));
+    const payload = (await request.json().catch(() => ({}))) as {
+      campaignSubject?: unknown;
+      password?: unknown;
+      username?: unknown;
+    };
     const result = await runPurplePricesBounceImport(
       typeof payload?.campaignSubject === "string" ? payload.campaignSubject : "",
+      {
+        password: typeof payload?.password === "string" ? payload.password : "",
+        username: typeof payload?.username === "string" ? payload.username : "",
+      },
     );
     revalidatePath("/");
     revalidatePath("/purple-prices-email");

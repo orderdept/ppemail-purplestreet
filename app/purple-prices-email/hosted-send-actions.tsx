@@ -5,10 +5,12 @@ import { useState } from "react";
 type Props = {
   canStartCampaign: boolean;
   readyCount: number;
+  smtpPassword: string;
+  smtpUsername: string;
   templateName?: string | null;
 };
 
-export function HostedSendActions({ canStartCampaign, readyCount, templateName }: Props) {
+export function HostedSendActions({ canStartCampaign, readyCount, smtpPassword, smtpUsername, templateName }: Props) {
   const [isTestingLogin, setIsTestingLogin] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isStartingCampaign, setIsStartingCampaign] = useState(false);
@@ -27,7 +29,14 @@ export function HostedSendActions({ canStartCampaign, readyCount, templateName }
     }
     setIsError(false);
     try {
-      const response = await fetch(path, { method: "POST" });
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: smtpPassword,
+          username: smtpUsername,
+        }),
+      });
       const data = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
         throw new Error(data.error || "That hosted mail action could not finish.");
@@ -57,7 +66,14 @@ export function HostedSendActions({ canStartCampaign, readyCount, templateName }
     setIsStartingCampaign(true);
     setIsError(false);
     try {
-      const response = await fetch("/api/purple-prices/send-campaign", { method: "POST" });
+      const response = await fetch("/api/purple-prices/send-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: smtpPassword,
+          username: smtpUsername,
+        }),
+      });
       const data = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) {
         throw new Error(data.error || "That hosted campaign could not start.");
@@ -76,7 +92,7 @@ export function HostedSendActions({ canStartCampaign, readyCount, templateName }
       <div className="button-row">
         <button
           className="action-link ghost button-like"
-          disabled={isTestingLogin}
+          disabled={isTestingLogin || !smtpPassword.trim()}
           onClick={() => void runAction("/api/purple-prices/smtp-test", "login")}
           type="button"
         >
@@ -84,7 +100,7 @@ export function HostedSendActions({ canStartCampaign, readyCount, templateName }
         </button>
         <button
           className="action-button"
-          disabled={isSendingTest || !templateName}
+          disabled={isSendingTest || !templateName || !smtpPassword.trim()}
           onClick={() => void runAction("/api/purple-prices/send-test", "send")}
           type="button"
         >
@@ -92,7 +108,7 @@ export function HostedSendActions({ canStartCampaign, readyCount, templateName }
         </button>
         <button
           className="action-button"
-          disabled={isStartingCampaign || !canStartCampaign}
+          disabled={isStartingCampaign || !canStartCampaign || !smtpPassword.trim()}
           onClick={() => void handleStartCampaign()}
           type="button"
         >

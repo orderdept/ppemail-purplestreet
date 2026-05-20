@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type ImportResult = {
   suppressionCount: number;
@@ -14,13 +14,31 @@ type ImportResult = {
   movedUnsubCount: number;
 };
 
-export function ImportBouncesButton({ campaignSubject = "" }: { campaignSubject?: string }) {
+export function ImportBouncesButton({
+  campaignSubject = "",
+  smtpUsername = "",
+}: {
+  campaignSubject?: string;
+  smtpUsername?: string;
+}) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [suppressionEmail, setSuppressionEmail] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [smtpPassword, setSmtpPassword] = useState("");
+
+  useEffect(() => {
+    const syncPassword = () => {
+      setSmtpPassword(window.sessionStorage.getItem("purple-prices-email-password") || "");
+    };
+    syncPassword();
+    window.addEventListener("purple-prices-password-changed", syncPassword as EventListener);
+    return () => {
+      window.removeEventListener("purple-prices-password-changed", syncPassword as EventListener);
+    };
+  }, []);
 
   async function handleImport() {
     setIsLoading(true);
@@ -30,7 +48,11 @@ export function ImportBouncesButton({ campaignSubject = "" }: { campaignSubject?
       const response = await fetch("/api/purple-prices/import-bounces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaignSubject }),
+        body: JSON.stringify({
+          campaignSubject,
+          password: smtpPassword,
+          username: smtpUsername,
+        }),
       });
       const data = (await response.json()) as ImportResult & { error?: string };
       if (!response.ok) {
@@ -82,7 +104,7 @@ export function ImportBouncesButton({ campaignSubject = "" }: { campaignSubject?
       <div className="button-row">
         <button
           className="action-button"
-          disabled={isLoading}
+          disabled={isLoading || !smtpPassword.trim()}
           onClick={handleImport}
           type="button"
         >
@@ -107,7 +129,10 @@ export function ImportBouncesButton({ campaignSubject = "" }: { campaignSubject?
         </button>
       </div>
       <p className={`inline-status ${isError ? "error-text" : ""}`}>
-        {message || `Scans the inbox for notices tied to "${campaignSubject || "the current campaign"}", files them, updates live suppressions, and lets you add one-offs by hand.`}
+        {message ||
+          (smtpPassword.trim()
+            ? `Scans the inbox for notices tied to "${campaignSubject || "the current campaign"}", files them, updates live suppressions, and lets you add one-offs by hand.`
+            : "Add the mailbox password in Step 3 before importing bounces.")}
       </p>
     </div>
   );

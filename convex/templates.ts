@@ -7,13 +7,19 @@ export const listByModule = query({
     campaignName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
+    if (!args.campaignName) {
+      return await ctx.db
+        .query("templates")
+        .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
+        .collect();
+    }
+    const campaignName = args.campaignName.trim();
+    return await ctx.db
       .query("templates")
-      .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
+      .withIndex("by_module_campaign", (q) =>
+        q.eq("moduleKey", args.moduleKey).eq("campaignName", campaignName),
+      )
       .collect();
-    if (!args.campaignName) return rows;
-    const matchName = args.campaignName.trim().toLowerCase();
-    return rows.filter((row) => row.campaignName.trim().toLowerCase() === matchName);
   },
 });
 
@@ -32,11 +38,13 @@ export const upsertForModule = mutation({
       .query("templates")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
       .collect();
+    const campaignName = args.campaignName.trim().toLowerCase();
+    const templateName = args.name.trim().toLowerCase();
 
     const match = existing.find(
       (row) =>
-        row.campaignName.trim().toLowerCase() === args.campaignName.trim().toLowerCase() &&
-        row.name.trim().toLowerCase() === args.name.trim().toLowerCase(),
+        (row.campaignName || "").trim().toLowerCase() === campaignName &&
+        row.name.trim().toLowerCase() === templateName,
     );
     const updatedAt = new Date().toISOString();
     const values = {
@@ -73,11 +81,13 @@ export const deleteForModule = mutation({
       .query("templates")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
       .collect();
+    const campaignName = args.campaignName.trim().toLowerCase();
+    const templateName = args.name.trim().toLowerCase();
 
     const match = existing.find(
       (row) =>
-        row.campaignName.trim().toLowerCase() === args.campaignName.trim().toLowerCase() &&
-        row.name.trim().toLowerCase() === args.name.trim().toLowerCase(),
+        (row.campaignName || "").trim().toLowerCase() === campaignName &&
+        row.name.trim().toLowerCase() === templateName,
     );
     if (!match) {
       return { deleted: false };

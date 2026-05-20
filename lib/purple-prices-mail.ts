@@ -20,6 +20,11 @@ type HostedSmtpConfig = {
   fromName: string;
 };
 
+type HostedCredentialOverrides = {
+  password?: string;
+  username?: string;
+};
+
 type SocketLike = net.Socket | tls.TLSSocket;
 
 function base64(value: string) {
@@ -41,8 +46,21 @@ function htmlEscape(value: string) {
     .replaceAll('"', "&quot;");
 }
 
+function safeHref(value: string) {
+  const trimmed = value.trim();
+  if (/^(https?:\/\/|mailto:)/i.test(trimmed)) {
+    return htmlEscape(trimmed);
+  }
+  return "";
+}
+
 function linkifyHtml(value: string) {
-  return htmlEscape(value).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#6d29a4;text-decoration:underline;">$1</a>');
+  const escaped = htmlEscape(value);
+  return escaped.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label: string, href: string) => {
+    const safe = safeHref(href);
+    if (!safe) return match;
+    return `<a href="${safe}" style="color:#6d29a4;text-decoration:underline;">${label}</a>`;
+  });
 }
 
 function htmlParagraphs(text: string) {
@@ -72,7 +90,7 @@ function htmlParagraphs(text: string) {
 }
 
 function linkifyText(value: string) {
-  return String(value || "").replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)");
+  return String(value || "").replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "$1 ($2)");
 }
 
 function buildHtmlBody(message: CampaignMessage, contact: MailRecipient) {
@@ -284,12 +302,16 @@ class SmtpSession {
   }
 }
 
-export function hostedSmtpConfigFromDraft(draft: CampaignDraft): HostedSmtpConfig {
+export function hostedSmtpConfigFromDraft(
+  draft: CampaignDraft,
+  overrides: HostedCredentialOverrides = {},
+): HostedSmtpConfig {
   const username =
+    overrides.username?.trim().toLowerCase() ||
     process.env.PP_EMAIL_SMTP_USERNAME?.trim().toLowerCase() ||
     process.env.PP_EMAIL_IMAP_USERNAME?.trim().toLowerCase() ||
     draft.smtpUsername.trim().toLowerCase();
-  const password = process.env.PP_EMAIL_SMTP_PASSWORD || process.env.PP_EMAIL_IMAP_PASSWORD || "";
+  const password = overrides.password?.trim() || process.env.PP_EMAIL_SMTP_PASSWORD || process.env.PP_EMAIL_IMAP_PASSWORD || "";
 
   if (!username || !password) {
     throw new Error("Hosted SMTP credentials are not configured yet on PS.");
@@ -305,8 +327,11 @@ export function hostedSmtpConfigFromDraft(draft: CampaignDraft): HostedSmtpConfi
   };
 }
 
-export async function hostedSmtpLoginTest(draft: CampaignDraft) {
-  const config = hostedSmtpConfigFromDraft(draft);
+export async function hostedSmtpLoginTest(
+  draft: CampaignDraft,
+  overrides: HostedCredentialOverrides = {},
+) {
+  const config = hostedSmtpConfigFromDraft(draft, overrides);
   const session = await SmtpSession.connect(config);
   try {
     if (config.security === "ssl") {
@@ -322,8 +347,12 @@ export async function hostedSmtpLoginTest(draft: CampaignDraft) {
   };
 }
 
-export async function sendHostedPurplePricesTestEmail(draft: CampaignDraft, message: CampaignMessage) {
-  const config = hostedSmtpConfigFromDraft(draft);
+export async function sendHostedPurplePricesTestEmail(
+  draft: CampaignDraft,
+  message: CampaignMessage,
+  overrides: HostedCredentialOverrides = {},
+) {
+  const config = hostedSmtpConfigFromDraft(draft, overrides);
   const session = await SmtpSession.connect(config);
   const recipient = { email: "oneteam@gmail.com", name: "Dan" };
   try {
@@ -347,8 +376,9 @@ export async function sendHostedPurplePricesCampaign(
   draft: CampaignDraft,
   message: CampaignMessage,
   recipients: MailRecipient[],
+  overrides: HostedCredentialOverrides = {},
 ) {
-  const config = hostedSmtpConfigFromDraft(draft);
+  const config = hostedSmtpConfigFromDraft(draft, overrides);
   const session = await SmtpSession.connect(config);
   const interval = draft.spacingMode === "daily"
     ? Math.ceil((24 * 60 * 60 * 1000) / Math.max(1, draft.dailyLimit || 1))

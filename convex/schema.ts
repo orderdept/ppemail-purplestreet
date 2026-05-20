@@ -97,7 +97,9 @@ export default defineSchema({
     body: v.string(),
     mailingAddress: v.string(),
     updatedAt: v.string(),
-  }).index("by_module", ["moduleKey"]),
+  })
+    .index("by_module", ["moduleKey"])
+    .index("by_module_campaign", ["moduleKey", "campaignName"]),
 
   modules: defineTable({
     key: v.string(),

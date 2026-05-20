@@ -19,7 +19,6 @@ export default async function PurplePricesEmailPage() {
   const draftCampaign = data.currentDraftCampaign;
   const latestCampaign = data.latestCampaign;
   const campaign = draftCampaign;
-  const template = data.latestTemplate;
   const remaining = Math.max(
     0,
     (campaign?.total || 0) - (campaign?.sent || 0) - (campaign?.failed || 0),
@@ -49,7 +48,7 @@ export default async function PurplePricesEmailPage() {
           <div className="hero-label-row">
             <span className="hero-kicker">Current campaign</span>
             <span className="hero-inline-meta">
-              {campaign?.subject || template?.message.subject || "No subject yet"}
+              {campaign?.subject || "No subject yet"}
             </span>
           </div>
           <div className="hero-progress-row">
@@ -71,8 +70,8 @@ export default async function PurplePricesEmailPage() {
         <div className="hero-metrics">
           <div className="hero-metric">
             <span>Sender</span>
-            <strong>{data.senderName}</strong>
-            <small>{data.senderEmail}</small>
+            <strong>{data.draft.fromName}</strong>
+            <small>{data.draft.smtpUsername}</small>
           </div>
           <div className="hero-metric">
             <span>Completed</span>
@@ -116,7 +115,7 @@ export default async function PurplePricesEmailPage() {
       <CampaignWorkspace
         draft={data.draft}
         suppressions={data.suppressions}
-        templateName={data.draft.draftMessageName || template?.name || null}
+        templateName={data.draft.draftMessageName || null}
       />
 
       <section className="content-grid">
@@ -164,7 +163,10 @@ export default async function PurplePricesEmailPage() {
           <h2>Suppressions</h2>
           <p>{compactNumber(data.suppressions.length)} addresses are excluded from future sends.</p>
           <div className="button-row">
-            <ImportBouncesButton campaignSubject={latestCampaign?.subject || template?.message.subject || ""} />
+            <ImportBouncesButton
+              campaignSubject={latestCampaign?.subject || ""}
+              smtpUsername={data.draft.smtpUsername}
+            />
           </div>
           <div className="button-row">
             <a className="action-link" href="/api/purple-prices/suppressions/export.csv">

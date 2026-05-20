@@ -5,8 +5,12 @@ import { sendHostedPurplePricesTestEmail } from "../../../../lib/purple-prices-m
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const payload = (await request.json().catch(() => ({}))) as {
+      password?: unknown;
+      username?: unknown;
+    };
     const data = await getPurplePricesData();
     if (!data.draft.messageSubject || !data.draft.messageBody) {
       return NextResponse.json(
@@ -20,6 +24,9 @@ export async function POST() {
       previewText: data.draft.messagePreviewText,
       body: data.draft.messageBody,
       mailingAddress: data.draft.messageMailingAddress,
+    }, {
+      password: typeof payload?.password === "string" ? payload.password : "",
+      username: typeof payload?.username === "string" ? payload.username : "",
     });
     return NextResponse.json({
       ok: true,

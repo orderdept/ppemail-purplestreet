@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { type CampaignContact, type CampaignDraft } from "../../lib/purple-prices-types";
 import { HostedSendActions } from "./hosted-send-actions";
@@ -19,6 +19,7 @@ type DraftContact = CampaignContact & {
 
 const defaultContactName = "Purple Peeps";
 const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const keychainHelperUrl = "http://127.0.0.1:8787";
 
 function normalizeEmail(value: string) {
   const match = String(value || "").match(emailPattern);
@@ -139,7 +140,10 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
   const [pasteText, setPasteText] = useState(initialDraft.pasteText);
   const [csvMode, setCsvMode] = useState<"replace" | "add">("replace");
   const [showAudiencePreview, setShowAudiencePreview] = useState(false);
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [keychainStatus, setKeychainStatus] = useState("Checking Mac Keychain...");
   const [saveStatus, setSaveStatus] = useState("Save your audience and delivery settings so the campaign is ready when you come back.");
+  const [deliveryStatus, setDeliveryStatus] = useState("Add the mailbox password, then run the sender login check.");
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -176,9 +180,15 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
     };
   }, [contacts, draft]);
 
-  async function saveSetup(nextDraft = draft, nextCsvContacts = csvContacts, nextTypedContacts = typedContacts, nextPasteText = pasteText) {
+  async function saveSetup(
+    nextDraft = draft,
+    nextCsvContacts = csvContacts,
+    nextTypedContacts = typedContacts,
+    nextPasteText = pasteText,
+    setStatus: (message: string) => void = setSaveStatus,
+  ) {
     setSaving(true);
-    setSaveStatus("Saving the campaign setup...");
+    setStatus("Saving the campaign setup...");
     try {
       const response = await fetch("/api/purple-prices/campaign-draft", {
         method: "POST",
@@ -200,12 +210,22 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
       if (!response.ok) {
         throw new Error(data.error || "Could not save the campaign setup.");
       }
-      setSaveStatus(`Saved ${data.contactCount || 0} contacts to Purplestreet.`);
+      setStatus(`Saved ${data.contactCount || 0} contacts to Purplestreet.`);
     } catch (error) {
-      setSaveStatus(error instanceof Error ? error.message : "Could not save the campaign setup.");
+      setStatus(error instanceof Error ? error.message : "Could not save the campaign setup.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveDeliverySettings() {
+    await saveSetup(draft, csvContacts, typedContacts, pasteText, (message) => {
+      setDeliveryStatus(
+        smtpPassword.trim()
+          ? `${message} Password is ready for login, bounces, and test sends in this browser session.`
+          : `${message} Add the mailbox password before checking login or importing bounces.`,
+      );
+    });
   }
 
   async function handleCsvChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -225,29 +245,23 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
     setShowAudiencePreview(true);
   }
 
-  async function handleRowEdit(contact: DraftContact, field: "email" | "name", value: string) {
-    if (contact.source === "csv") {
-      const nextCsvContacts = [...csvContacts];
-      const current = nextCsvContacts[contact.sourceIndex];
-      if (!current) return;
-      nextCsvContacts[contact.sourceIndex] = {
-        ...current,
-        [field]: field === "email" ? normalizeEmail(value) || current.email : value,
-      };
-      setCsvContacts(nextCsvContacts);
-      await saveSetup(draft, nextCsvContacts, typedContacts, pasteText);
-      return;
-    }
+  function handleRowEdit(source: DraftContact["source"], sourceIndex: number, field: keyof CampaignContact, value: string) {
+    const nextValue = field === "email" ? value.trim().toLowerCase() : value;
+    const updateContact = (contact: CampaignContact, index: number) =>
+      index === sourceIndex ? { ...contact, [field]: nextValue } : contact;
 
-    const nextTypedContacts = [...typedContacts];
-    const current = nextTypedContacts[contact.sourceIndex];
-    if (!current) return;
-    nextTypedContacts[contact.sourceIndex] = {
-      ...current,
-      [field]: field === "email" ? normalizeEmail(value) || current.email : value,
-    };
-    setTypedContacts(nextTypedContacts);
-    await saveSetup(draft, csvContacts, nextTypedContacts, pasteText);
+    if (source === "csv") {
+      setCsvContacts((current) => current.map(updateContact));
+    } else {
+      setTypedContacts((current) => current.map(updateContact));
+    }
+    setSaveStatus("Recipient updated. Save setup when you're ready.");
+  }
+
+  async function handleRowEditBlur() {
+    await saveSetup(draft, csvContacts, typedContacts, pasteText, () => {
+      setSaveStatus("Recipient edit saved to Purplestreet.");
+    });
   }
 
   async function handleClearList() {
@@ -262,6 +276,87 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
 
   const visibleRows = contacts.slice(0, 300);
   const hasSavedMessage = Boolean(draft.draftMessageName && draft.messageSubject && draft.messageBody);
+
+  useEffect(() => {
+    if (smtpPassword.trim()) {
+      window.sessionStorage.setItem("purple-prices-email-password", smtpPassword);
+    } else {
+      window.sessionStorage.removeItem("purple-prices-email-password");
+    }
+    window.dispatchEvent(new CustomEvent("purple-prices-password-changed", { detail: smtpPassword }));
+  }, [smtpPassword]);
+
+  useEffect(() => {
+    const sessionPassword = window.sessionStorage.getItem("purple-prices-email-password") || "";
+    if (sessionPassword) {
+      setSmtpPassword(sessionPassword);
+      setDeliveryStatus("Saved browser-session password is ready. Run the sender login check when ready.");
+    }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadSavedPassword() {
+      try {
+        const statusResponse = await fetch(`${keychainHelperUrl}/status?username=${encodeURIComponent(draft.smtpUsername)}`);
+        const statusData = (await statusResponse.json()) as { hasPassword?: boolean };
+        if (ignore) return;
+
+        if (!statusData.hasPassword) {
+          setKeychainStatus("Mac Keychain helper is running. No saved password found for this sender yet.");
+          return;
+        }
+
+        const loadResponse = await fetch(`${keychainHelperUrl}/load`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: draft.smtpUsername }),
+        });
+        const loadData = (await loadResponse.json().catch(() => ({}))) as { password?: string };
+        if (ignore) return;
+
+        if (loadResponse.ok && loadData.password) {
+          setSmtpPassword(loadData.password);
+          setKeychainStatus("Saved Mac Keychain password is ready for this sender.");
+          setDeliveryStatus("Saved Mac Keychain password is ready. Run the sender login check when ready.");
+        } else {
+          setKeychainStatus("Mac Keychain has a saved item, but it could not be loaded.");
+        }
+      } catch {
+        if (!ignore) {
+          setKeychainStatus("Mac Keychain helper is not running on this Mac.");
+        }
+      }
+    }
+
+    void loadSavedPassword();
+    return () => {
+      ignore = true;
+    };
+  }, [draft.smtpUsername]);
+
+  async function savePasswordToKeychain() {
+    if (!smtpPassword.trim()) {
+      setKeychainStatus("Enter the mailbox password first, then save it to Mac Keychain.");
+      return;
+    }
+    setKeychainStatus("Saving password to Mac Keychain...");
+    try {
+      const response = await fetch(`${keychainHelperUrl}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: draft.smtpUsername, password: smtpPassword }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Could not save the password to Mac Keychain.");
+      }
+      setKeychainStatus("Password saved to Mac Keychain for this sender.");
+    } catch (error) {
+      setKeychainStatus(error instanceof Error ? error.message : "Mac Keychain helper is not running on this Mac.");
+    }
+  }
 
   return (
     <section className="workflow-stack">
@@ -306,19 +401,11 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
             <span>CSV import mode</span>
             <div className="choice-row">
               <label className="choice-option">
-                <input
-                  checked={csvMode === "replace"}
-                  onChange={() => setCsvMode("replace")}
-                  type="checkbox"
-                />
+                <input checked={csvMode === "replace"} onChange={() => setCsvMode("replace")} type="checkbox" />
                 <span>Replace current uploaded list</span>
               </label>
               <label className="choice-option">
-                <input
-                  checked={csvMode === "add"}
-                  onChange={() => setCsvMode("add")}
-                  type="checkbox"
-                />
+                <input checked={csvMode === "add"} onChange={() => setCsvMode("add")} type="checkbox" />
                 <span>Add to existing uploaded list</span>
               </label>
             </div>
@@ -361,14 +448,20 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
                         <input
                           className="table-input"
                           defaultValue={contact.email}
-                          onBlur={(event) => void handleRowEdit(contact, "email", event.target.value)}
+                          onBlur={(event) => {
+                            handleRowEdit(contact.source, contact.sourceIndex, "email", event.target.value);
+                            void handleRowEditBlur();
+                          }}
                         />
                       </td>
                       <td>
                         <input
                           className="table-input"
                           defaultValue={contact.name || defaultContactName}
-                          onBlur={(event) => void handleRowEdit(contact, "name", event.target.value)}
+                          onBlur={(event) => {
+                            handleRowEdit(contact.source, contact.sourceIndex, "name", event.target.value);
+                            void handleRowEditBlur();
+                          }}
                         />
                       </td>
                       <td>
@@ -400,10 +493,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
           <div className="host-form-grid">
             <label className="field">
               <span>SMTP host</span>
-              <input
-                onChange={(event) => setDraft((current) => ({ ...current, smtpHost: event.target.value }))}
-                value={draft.smtpHost}
-              />
+              <input onChange={(event) => setDraft((current) => ({ ...current, smtpHost: event.target.value }))} value={draft.smtpHost} />
             </label>
             <label className="field">
               <span>Port</span>
@@ -430,7 +520,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
               </select>
             </label>
             <label className="field">
-              <span>Sender email</span>
+              <span>Sender</span>
               <input
                 onChange={(event) => setDraft((current) => ({ ...current, smtpUsername: event.target.value }))}
                 type="email"
@@ -439,9 +529,18 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
             </label>
             <label className="field">
               <span>From name</span>
+              <input onChange={(event) => setDraft((current) => ({ ...current, fromName: event.target.value }))} value={draft.fromName} />
+            </label>
+            <label className="field">
+              <span>Mailbox password</span>
               <input
-                onChange={(event) => setDraft((current) => ({ ...current, fromName: event.target.value }))}
-                value={draft.fromName}
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-form-type="other"
+                data-lpignore="true"
+                onChange={(event) => setSmtpPassword(event.target.value)}
+                type="password"
+                value={smtpPassword}
               />
             </label>
             <label className="field">
@@ -481,10 +580,15 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
           </div>
 
           <div className="button-row">
-            <button className="action-link button-like" disabled={saving} onClick={() => void saveSetup()} type="button">
+            <button className="action-link button-like" disabled={saving} onClick={() => void saveDeliverySettings()} type="button">
               Save settings
             </button>
+            <button className="action-link ghost button-like" onClick={() => void savePasswordToKeychain()} type="button">
+              Save to Mac Keychain
+            </button>
           </div>
+          <small className="template-status">{deliveryStatus}</small>
+          <small className="template-status">{keychainStatus}</small>
         </article>
 
         <article className="panel">
@@ -492,7 +596,7 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
             <div>
               <p className="section-step">Step 4</p>
               <h2>Run a final check</h2>
-              <p>Make sure the timing feels right, then verify login and send a live test.</p>
+              <p>Make sure the timing feels right, then verify login, send a live test, or start the full campaign.</p>
             </div>
           </div>
 
@@ -516,13 +620,12 @@ export function CampaignWorkspace({ draft: initialDraft, suppressions, templateN
           </div>
 
           <HostedSendActions
-            canStartCampaign={counts.ready > 0 && hasSavedMessage}
+            canStartCampaign={counts.ready > 0 && hasSavedMessage && Boolean(smtpPassword.trim())}
             readyCount={counts.ready}
-            templateName={draft.draftMessageName || templateName}
+            smtpPassword={smtpPassword}
+            smtpUsername={draft.smtpUsername}
+            templateName={templateName}
           />
-          <p className="quiet-note">
-            Use the login check first if anything looks off, then send a live test before the full campaign run.
-          </p>
         </article>
       </div>
     </section>

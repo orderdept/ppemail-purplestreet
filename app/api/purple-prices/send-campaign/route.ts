@@ -11,8 +11,12 @@ function normalizeEmail(value: string) {
   return String(value || "").trim().toLowerCase();
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const payload = (await request.json().catch(() => ({}))) as {
+      password?: unknown;
+      username?: unknown;
+    };
     const data = await getPurplePricesData();
     const draft = data.draft;
 
@@ -52,12 +56,20 @@ export async function POST() {
     }
 
     const startedAt = new Date().toISOString();
-    const result = await sendHostedPurplePricesCampaign(draft, {
-      subject: draft.messageSubject,
-      previewText: draft.messagePreviewText,
-      body: draft.messageBody,
-      mailingAddress: draft.messageMailingAddress,
-    }, recipients);
+    const result = await sendHostedPurplePricesCampaign(
+      draft,
+      {
+        subject: draft.messageSubject,
+        previewText: draft.messagePreviewText,
+        body: draft.messageBody,
+        mailingAddress: draft.messageMailingAddress,
+      },
+      recipients,
+      {
+        password: typeof payload?.password === "string" ? payload.password : "",
+        username: typeof payload?.username === "string" ? payload.username : "",
+      },
+    );
 
     const sentCount = result.results.filter((row) => row.status === "sent").length;
     const failedRows = result.results.filter((row) => row.status === "failed");

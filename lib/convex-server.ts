@@ -67,7 +67,7 @@ export async function getConvexTemplates() {
   const rows = await client.query(api.templates.listByModule, { moduleKey });
   return rows.map<SavedTemplate>((row) => ({
     id: String(row._id),
-    campaignName: row.campaignName,
+    campaignName: row.campaignName || "",
     name: row.name,
     updatedAt: row.updatedAt,
     message: {
@@ -87,7 +87,7 @@ export async function getConvexTemplatesForCampaign(campaignName: string) {
   const rows = await client.query(api.templates.listByModule, { moduleKey, campaignName });
   return rows.map<SavedTemplate>((row) => ({
     id: String(row._id),
-    campaignName: row.campaignName,
+    campaignName: row.campaignName || "",
     name: row.name,
     updatedAt: row.updatedAt,
     message: {

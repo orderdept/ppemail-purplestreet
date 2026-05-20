@@ -9,6 +9,8 @@ const DELAYED_SUBJECT = "Delayed Mail (still being retried)";
 const BOUNCED_FOLDER = "BOUNCED";
 const DELAYED_FOLDER = "DELAYED";
 const UNSUB_FOLDER = "UNSUB";
+const IMAP_READ_TIMEOUT_MS = 25000;
+const MAX_IMPORT_SCAN_UIDS = 300;
 const BOUNCED_SUBJECT_PREFIXES = [
   "undeliver",
   "mail system error - returned mail with subject:",
@@ -155,13 +157,16 @@ class SimpleImapClient {
   private buffer = Buffer.alloc(0);
   private tag = 0;
 
-  async connect() {
+  async connect(overrides: { password?: string; username?: string } = {}) {
     const host = process.env.PP_EMAIL_IMAP_HOST || "imap.qboxmail.com";
     const port = Number(process.env.PP_EMAIL_IMAP_PORT || "993");
-    const username = process.env.PP_EMAIL_IMAP_USERNAME || DEFAULT_SMTP_USER;
-    const password = process.env.PP_EMAIL_IMAP_PASSWORD || "";
+    const username =
+      overrides.username?.trim().toLowerCase() ||
+      process.env.PP_EMAIL_IMAP_USERNAME ||
+      DEFAULT_SMTP_USER;
+    const password = overrides.password?.trim() || process.env.PP_EMAIL_IMAP_PASSWORD || "";
     if (!password) {
-      throw new Error("PP_EMAIL_IMAP_PASSWORD is not configured.");
+      throw new Error("Enter the mailbox password in Step 3 before importing bounces.");
     }
 
     this.socket = tls.connect({
@@ -193,6 +198,26 @@ class SimpleImapClient {
     }
   }
 
+  async resolveFolderName(baseName: string) {
+    const list = await this.command("LIST \"\" *");
+    const inboxFolder = `INBOX.${baseName}`;
+
+    if (list.lines.some((line) => line.includes(`"${inboxFolder}"`) || line.endsWith(` ${inboxFolder}`))) {
+      return inboxFolder;
+    }
+    if (list.lines.some((line) => line.includes(`"${baseName}"`) || line.endsWith(` ${baseName}`))) {
+      return baseName;
+    }
+
+    const inboxLine = list.lines.find((line) => /\s"INBOX"$/i.test(line) || /\sINBOX$/i.test(line));
+    const delimiter = inboxLine?.match(/\* LIST \([^)]+\) "([^"]+)" /)?.[1] || ".";
+    if (inboxLine) {
+      return `INBOX${delimiter}${baseName}`;
+    }
+
+    return baseName;
+  }
+
   async select(mailbox: string) {
     await this.command(`SELECT ${this.quote(mailbox)}`);
   }
@@ -200,11 +225,12 @@ class SimpleImapClient {
   async searchAllUids() {
     const result = await this.command("UID SEARCH ALL");
     const searchLine = result.lines.find((line) => line.startsWith("* SEARCH")) || "";
-    return searchLine
+    const uids = searchLine
       .replace("* SEARCH", "")
       .trim()
       .split(/\s+/)
       .filter(Boolean);
+    return uids.slice(-MAX_IMPORT_SCAN_UIDS);
   }
 
   async fetchMessage(uid: string) {
@@ -299,6 +325,10 @@ class SimpleImapClient {
         reject(new Error("IMAP socket is not connected."));
         return;
       }
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("IMAP server took too long to respond. Try Import Bounces again in a moment."));
+      }, IMAP_READ_TIMEOUT_MS);
       const onData = () => {
         cleanup();
         resolve();
@@ -312,6 +342,7 @@ class SimpleImapClient {
         reject(new Error("IMAP connection closed."));
       };
       const cleanup = () => {
+        clearTimeout(timer);
         this.socket?.off("data", onData);
         this.socket?.off("error", onError);
         this.socket?.off("close", onClose);
@@ -346,7 +377,10 @@ async function mergedSuppressionMap() {
   return map;
 }
 
-export async function runPurplePricesBounceImport(campaignSubject?: string) {
+export async function runPurplePricesBounceImport(
+  campaignSubject?: string,
+  overrides: { password?: string; username?: string } = {},
+) {
   const suppressions = await mergedSuppressionMap();
   const campaignRecipients = await readCampaignRecipients();
   const client = new SimpleImapClient();
@@ -358,33 +392,38 @@ export async function runPurplePricesBounceImport(campaignSubject?: string) {
   let movedUnsubCount = 0;
 
   try {
-    await client.connect();
-    await client.ensureFolder(BOUNCED_FOLDER);
-    await client.ensureFolder(DELAYED_FOLDER);
-    await client.ensureFolder(UNSUB_FOLDER);
+    await client.connect(overrides);
+    const bouncedFolder = await client.resolveFolderName(BOUNCED_FOLDER);
+    const delayedFolder = await client.resolveFolderName(DELAYED_FOLDER);
+    const unsubFolder = await client.resolveFolderName(UNSUB_FOLDER);
+    await client.ensureFolder(bouncedFolder);
+    await client.ensureFolder(delayedFolder);
+    await client.ensureFolder(unsubFolder);
     await client.select("INBOX");
     const uids = await client.searchAllUids();
 
     const buckets: Record<string, string[]> = {
-      [BOUNCED_FOLDER]: [],
-      [DELAYED_FOLDER]: [],
-      [UNSUB_FOLDER]: [],
+      [bouncedFolder]: [],
+      [delayedFolder]: [],
+      [unsubFolder]: [],
     };
 
     for (const uid of uids) {
       const rawMessage = await client.fetchMessage(uid);
       const [rawHeaders] = rawMessage.split(/\r?\n\r?\n/, 1);
       const subject = headerValue(rawHeaders || rawMessage, "Subject");
-      const folderName = classifyNoticeSubject(subject);
-      if (!folderName) continue;
+      const noticeType = classifyNoticeSubject(subject);
+      if (!noticeType) continue;
+      const folderName =
+        noticeType === BOUNCED_FOLDER ? bouncedFolder : noticeType === DELAYED_FOLDER ? delayedFolder : unsubFolder;
       if (
-        (folderName === BOUNCED_FOLDER || folderName === DELAYED_FOLDER) &&
+        (noticeType === BOUNCED_FOLDER || noticeType === DELAYED_FOLDER) &&
         !campaignSubjectMatchesNotice(rawMessage, campaignSubject)
       ) {
         continue;
       }
 
-      if (folderName === BOUNCED_FOLDER) {
+      if (noticeType === BOUNCED_FOLDER) {
         const recipients = extractFailedRecipients(rawMessage);
         const campaignOnlyRecipients = campaignRecipients.emails.size
           ? recipients.filter((email) => campaignRecipients.emails.has(email))
@@ -399,7 +438,7 @@ export async function runPurplePricesBounceImport(campaignSubject?: string) {
         bounceCount += campaignOnlyRecipients.length;
       }
 
-      if (folderName === DELAYED_FOLDER) {
+      if (noticeType === DELAYED_FOLDER) {
         const recipients = extractFailedRecipients(rawMessage);
         const campaignOnlyRecipients = campaignRecipients.emails.size
           ? recipients.filter((email) => campaignRecipients.emails.has(email))
@@ -411,7 +450,7 @@ export async function runPurplePricesBounceImport(campaignSubject?: string) {
         delayedCount += 1;
       }
 
-      if (folderName === UNSUB_FOLDER) {
+      if (noticeType === UNSUB_FOLDER) {
         buckets[folderName].push(uid);
         const email =
           firstEmailInText(headerValue(rawHeaders || rawMessage, "Reply-To")) ||
@@ -428,17 +467,17 @@ export async function runPurplePricesBounceImport(campaignSubject?: string) {
       }
     }
 
-    if (buckets[BOUNCED_FOLDER].length) {
-      await client.move(buckets[BOUNCED_FOLDER].join(","), BOUNCED_FOLDER);
-      movedCount = buckets[BOUNCED_FOLDER].length;
+    if (buckets[bouncedFolder].length) {
+      await client.move(buckets[bouncedFolder].join(","), bouncedFolder);
+      movedCount = buckets[bouncedFolder].length;
     }
-    if (buckets[DELAYED_FOLDER].length) {
-      await client.move(buckets[DELAYED_FOLDER].join(","), DELAYED_FOLDER);
-      movedDelayedCount = buckets[DELAYED_FOLDER].length;
+    if (buckets[delayedFolder].length) {
+      await client.move(buckets[delayedFolder].join(","), delayedFolder);
+      movedDelayedCount = buckets[delayedFolder].length;
     }
-    if (buckets[UNSUB_FOLDER].length) {
-      await client.move(buckets[UNSUB_FOLDER].join(","), UNSUB_FOLDER);
-      movedUnsubCount = buckets[UNSUB_FOLDER].length;
+    if (buckets[unsubFolder].length) {
+      await client.move(buckets[unsubFolder].join(","), unsubFolder);
+      movedUnsubCount = buckets[unsubFolder].length;
     }
 
     const suppressionItems = [...suppressions.values()].sort((left, right) =>
