@@ -302,7 +302,7 @@ export default function PepCustomersPage() {
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
-  const [copied, setCopied] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
   const filteredOrders = useMemo(
@@ -368,7 +368,7 @@ export default function PepCustomersPage() {
   async function copyAddress(order: OrderRow) {
     const label = addressLabel(order);
     await navigator.clipboard.writeText(label);
-    setCopied(label);
+    setCopyStatus(`Copied address for ${order.customerName}.`);
   }
 
   return (
@@ -507,10 +507,20 @@ export default function PepCustomersPage() {
           </div>
           <div className="page-top-actions">
             <button className="action-button" type="button" onClick={() => downloadCsv(exportCustomers)}>Download CSV</button>
-            <button className="action-button ghost" type="button" onClick={() => void navigator.clipboard.writeText(exportCustomers.map((row) => row.email).join("\n"))}>Copy emails</button>
+            <button
+              className="action-button ghost"
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(exportCustomers.map((row) => row.email).join("\n"));
+                setCopyStatus(`Copied ${exportCustomers.length} email${exportCustomers.length === 1 ? "" : "s"}.`);
+              }}
+            >
+              Copy emails
+            </button>
           </div>
         </div>
-        <pre className="log-box">{copied || exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
+        {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
+        <pre className="log-box">{exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
       </section>
     </main>
   );
