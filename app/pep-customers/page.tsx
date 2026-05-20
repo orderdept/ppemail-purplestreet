@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 type OrderRow = {
@@ -73,6 +73,7 @@ const optionalColumns = {
 
 type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
+const savedOrdersKey = "pep-customers-orders-v1";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -242,6 +243,22 @@ function importOrders(rows: unknown[][]) {
     .filter((order): order is OrderRow => Boolean(order));
 }
 
+function mergeOrders(existing: OrderRow[], incoming: OrderRow[]) {
+  const byOrderId = new Map(existing.map((order) => [order.orderId, order]));
+  let added = 0;
+  let updated = 0;
+  incoming.forEach((order) => {
+    if (byOrderId.has(order.orderId)) updated += 1;
+    else added += 1;
+    byOrderId.set(order.orderId, order);
+  });
+  const orders = Array.from(byOrderId.values()).sort((a, b) => {
+    const dateCompare = a.orderDate.localeCompare(b.orderDate);
+    return dateCompare || a.orderId.localeCompare(b.orderId, undefined, { numeric: true });
+  });
+  return { orders, added, updated };
+}
+
 function customerGroups(orders: OrderRow[]) {
   const groups = new Map<string, CustomerRow>();
   orders.forEach((order) => {
@@ -297,6 +314,8 @@ function downloadCsv(rows: Array<{ firstName: string; email: string; customerNam
 
 export default function PepCustomersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const ordersRef = useRef<OrderRow[]>([]);
+  const [restored, setRestored] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("No order file loaded");
   const [search, setSearch] = useState("");
@@ -341,6 +360,27 @@ export default function PepCustomersPage() {
     return Array.from(rows.values()).sort((a, b) => a.email.localeCompare(b.email));
   }, [filteredOrders, orders, selected]);
 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(savedOrdersKey) || "[]") as OrderRow[];
+      if (Array.isArray(saved) && saved.length) {
+        ordersRef.current = saved;
+        setOrders(saved);
+        setStatus(`Loaded ${saved.length} saved order lines`);
+      }
+    } catch {
+      setStatus("Saved order data could not be loaded.");
+    } finally {
+      setRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+    if (!restored) return;
+    window.localStorage.setItem(savedOrdersKey, JSON.stringify(orders));
+  }, [orders, restored]);
+
   async function handleFile(file: File) {
     setStatus("Reading order file...");
     try {
@@ -348,9 +388,11 @@ export default function PepCustomersPage() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: true });
       const imported = importOrders(rows);
-      setOrders(imported);
+      const merged = mergeOrders(ordersRef.current, imported);
+      ordersRef.current = merged.orders;
+      setOrders(merged.orders);
       setSelected(new Set());
-      setStatus(`Imported ${imported.length} order lines from ${file.name}`);
+      setStatus(`Added ${merged.added} new order lines and updated ${merged.updated} existing lines from ${file.name}.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not import that order file.");
     }
