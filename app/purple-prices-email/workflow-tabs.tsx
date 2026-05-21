@@ -52,54 +52,47 @@ type Props = {
 
 const tabStorageKey = "purple-prices-workflow-tab";
 
-const tabs: Array<{ id: WorkflowTab; label: string; navLabel: string; icon: string; description: string }> = [
+const tabs: Array<{ id: WorkflowTab; label: string; navLabel: string; description: string }> = [
   {
     id: "desk",
     label: "Campaign Desk",
     navLabel: "Campaigns",
-    icon: "CD",
     description: "Create a campaign draft or load older campaign records.",
   },
   {
     id: "message",
     label: "Message",
     navLabel: "Message",
-    icon: "MS",
     description: "Write, save, and reload campaign-specific email messages.",
   },
   {
     id: "audience",
     label: "Audience",
     navLabel: "Audience",
-    icon: "AU",
     description: "Import campaign recipients, dedupe, and apply suppressions.",
   },
   {
     id: "delivery",
     label: "Delivery",
     navLabel: "Delivery",
-    icon: "DL",
     description: "Set sender identity, SMTP settings, limits, and password flow.",
   },
   {
     id: "final",
     label: "Final Check",
     navLabel: "Final Check",
-    icon: "FC",
     description: "Check login, send a live test, and launch the campaign.",
   },
   {
     id: "hygiene",
     label: "Hygiene",
     navLabel: "Hygiene",
-    icon: "HY",
     description: "Import bounces, export suppressions, and search blocked addresses.",
   },
   {
     id: "logs",
     label: "Logs",
     navLabel: "Logs",
-    icon: "LG",
     description: "Review delivery failures and recent sender activity.",
   },
 ];
@@ -177,7 +170,6 @@ export function WorkflowTabs({
               role="tab"
               type="button"
             >
-              <span className="nav-icon" aria-hidden="true">{tab.icon}</span>
               <span>{tab.navLabel}</span>
             </button>
           ))}
@@ -190,7 +182,6 @@ export function WorkflowTabs({
 
         <div className="sidebar-footer">
           <a className="sidebar-nav-link" href="/">
-            <span className="nav-icon" aria-hidden="true">PS</span>
             <span>Back to PS</span>
           </a>
         </div>
