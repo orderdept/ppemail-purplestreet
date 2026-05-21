@@ -111,6 +111,24 @@ code {
   text-transform: uppercase;
 }
 
+.sidebar-home-link {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--accent);
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.sidebar-home-link:hover {
+  background: #e9dfef;
+}
+
 .sidebar-nav {
   display: grid;
   gap: 4px;
@@ -168,14 +186,6 @@ code {
 
 .sidebar-primary-action:hover {
   background: var(--accent-strong);
-}
-
-.sidebar-footer {
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 4px;
-  margin-top: auto;
-  padding-top: 16px;
 }
 
 .module-main {

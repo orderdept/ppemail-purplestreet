@@ -158,6 +158,10 @@ export function WorkflowTabs({
           </div>
         </div>
 
+        <a className="sidebar-home-link" href="/">
+          Back to Purplestreet
+        </a>
+
         <nav className="sidebar-nav" role="tablist" aria-label="Campaign workflow">
           {tabs.map((tab) => (
             <button
@@ -179,12 +183,6 @@ export function WorkflowTabs({
           <span aria-hidden="true">+</span>
           New campaign
         </button>
-
-        <div className="sidebar-footer">
-          <a className="sidebar-nav-link" href="/">
-            <span>Back to PS</span>
-          </a>
-        </div>
       </aside>
 
       <div className="module-main">
