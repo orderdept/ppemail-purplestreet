@@ -207,6 +207,7 @@ export type PepCustomerOrder = {
   orderDate: string;
   sku: string;
   productName: string;
+  dose: string;
   brand: string;
   qty: number;
   cost: number;
@@ -238,6 +239,7 @@ function toPepCustomerOrder(row: ConvexPepCustomerOrder): PepCustomerOrder {
     orderDate: row.orderDate,
     sku: row.sku,
     productName: row.productName,
+    dose: row.dose || "",
     brand: row.brand,
     qty: row.qty,
     cost: row.cost,

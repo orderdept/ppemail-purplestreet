@@ -118,6 +118,7 @@ export default defineSchema({
     orderDate: v.string(),
     sku: v.string(),
     productName: v.string(),
+    dose: v.optional(v.string()),
     brand: v.string(),
     qty: v.number(),
     cost: v.number(),

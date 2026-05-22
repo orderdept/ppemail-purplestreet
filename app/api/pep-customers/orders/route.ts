@@ -34,6 +34,7 @@ function cleanOrder(value: unknown): PepCustomerOrder | null {
     orderDate: cleanText(row.orderDate),
     sku: cleanText(row.sku),
     productName: cleanText(row.productName),
+    dose: cleanText(row.dose),
     brand: cleanText(row.brand),
     qty: cleanMoney(row.qty),
     cost,

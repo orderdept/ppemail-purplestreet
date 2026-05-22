@@ -11,6 +11,7 @@ type OrderRow = {
   orderDate: string;
   sku: string;
   productName: string;
+  dose: string;
   brand: string;
   qty: number;
   cost: number;
@@ -33,6 +34,7 @@ type OrderRow = {
 type OrderItem = {
   orderId: string;
   productName: string;
+  dose: string;
   qty: number;
   sku: string;
 };
@@ -69,12 +71,12 @@ const requiredColumns = {
 const optionalColumns = {
   productName: ["product_name", "product", "item_name", "item"],
   ingredient: ["ingredient"],
+  dose: ["dose"],
 } as const;
 
 type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
 type TabKey = "customers" | "orders" | "import" | "export";
-const savedOrdersKey = "pep-customers-orders-v1";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -141,6 +143,10 @@ function productLabel(value: unknown) {
   return glpBrand(value) || cleanText(value);
 }
 
+function productDoseLabel(item: { productName: string; sku: string; dose?: string }) {
+  return [productLabel(item.productName || item.sku), cleanText(item.dose)].filter(Boolean).join(" ");
+}
+
 function dateSearchText(value: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return value;
@@ -155,7 +161,7 @@ function addressLabel(order: OrderRow | CustomerRow) {
   const items: OrderItem[] = "items" in order ? order.items : [order];
   const itemTotals = new Map<string, number>();
   items.forEach((item) => {
-    const label = productLabel(item.productName || item.sku);
+    const label = productDoseLabel(item);
     itemTotals.set(label, (itemTotals.get(label) || 0) + (item.qty || 0));
   });
   const itemLines = Array.from(itemTotals.entries()).map(([label, qty]) => `Qty ${qty} - ${label}`);
@@ -227,6 +233,7 @@ function importOrders(rows: unknown[][]) {
               cleanText(cell(row, columns, "brand"))
           ) ||
           cleanText(cell(row, columns, "sku")),
+        dose: cleanText(optionalCell(row, optional, "dose")),
         brand: glpBrand(cell(row, columns, "brand")),
         qty: Number(cell(row, columns, "qty")) || 0,
         cost,
@@ -272,6 +279,7 @@ function customerGroups(orders: OrderRow[]) {
     existing.items.push({
       orderId: order.orderId,
       productName: order.productName,
+      dose: order.dose,
       qty: order.qty,
       sku: order.sku,
     });
@@ -391,32 +399,11 @@ export default function PepCustomersPage() {
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error || "Could not load saved orders.");
 
-        let saved = Array.isArray(data.orders) ? (data.orders as OrderRow[]) : [];
-        let migrated = false;
-
-        if (!saved.length) {
-          const localRows = JSON.parse(window.localStorage.getItem(savedOrdersKey) || "[]") as OrderRow[];
-          if (Array.isArray(localRows) && localRows.length) {
-            const migration = await fetch("/api/pep-customers/orders", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orders: localRows, sourceFile: "Browser saved orders" }),
-            });
-            const migrationData = await migration.json();
-            if (migration.ok) {
-              saved = Array.isArray(migrationData.orders) ? migrationData.orders : localRows;
-              migrated = true;
-              window.localStorage.removeItem(savedOrdersKey);
-              if (!ignore) setStatus(`Moved ${saved.length} saved order lines into the server database.`);
-            }
-          }
-        }
+        const saved = Array.isArray(data.orders) ? (data.orders as OrderRow[]) : [];
 
         if (!ignore) {
           setOrders(saved);
-          if (migrated) {
-            setStatus(`Moved ${saved.length} saved order lines into the server database.`);
-          } else if (saved.length) {
+          if (saved.length) {
             setStatus(`Loaded ${saved.length} saved order lines from the server database.`);
           } else if (!saved.length) {
             setStatus("No saved orders yet. Import an order spreadsheet to begin.");
