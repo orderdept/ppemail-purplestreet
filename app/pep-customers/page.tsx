@@ -51,6 +51,7 @@ type CustomerRow = OrderRow & {
 };
 
 type ProcessOrderRow = OrderRow & {
+  groupKey: string;
   orderGroups: Set<string>;
   orderIds: string[];
   items: OrderItem[];
@@ -204,6 +205,18 @@ function addressText(order: OrderRow) {
   return [order.address, order.address2, order.city, order.state, order.zipcode].filter(Boolean).join(", ");
 }
 
+function shippingAddressKey(order: Pick<OrderRow, "address" | "address2" | "city" | "state" | "zipcode">) {
+  const normalized = [order.address, order.address2, order.city, order.state, order.zipcode]
+    .map((value) => cleanText(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim())
+    .filter(Boolean)
+    .join("|");
+  return normalized || "missing-shipping-address";
+}
+
+function hasShippingAddress(order: Pick<OrderRow, "address" | "city" | "state" | "zipcode">) {
+  return Boolean(order.address && order.city && order.state && order.zipcode);
+}
+
 function sortValue(order: OrderRow, key: OrderSortKey) {
   if (key === "qty" || key === "cost" || key === "price" || key === "profit") return order[key];
   if (key === "status") return order.processedAt ? "sent" : "pending";
@@ -255,30 +268,50 @@ function addressLabel(order: OrderRow | CustomerRow | ProcessOrderRow) {
 
 function processOrderGroups(orders: OrderRow[]) {
   const groups = new Map<string, ProcessOrderRow>();
-  const bestShippingByCustomer = new Map<string, OrderRow>();
+  const bestShippingByOrderGroup = new Map<string, OrderRow>();
+  const shippingByCustomer = new Map<string, Map<string, OrderRow>>();
 
   orders.forEach((order) => {
-    const key = customerKey(order);
-    const existing = bestShippingByCustomer.get(key);
+    const orderGroupKey = `${customerKey(order)}|${order.orderGroup}`;
+    const existing = bestShippingByOrderGroup.get(orderGroupKey);
     if (!existing || shippingScore(order) > shippingScore(existing)) {
-      bestShippingByCustomer.set(key, order);
+      bestShippingByOrderGroup.set(orderGroupKey, order);
+    }
+
+    if (hasShippingAddress(order)) {
+      const customerShipping = shippingByCustomer.get(customerKey(order)) || new Map<string, OrderRow>();
+      const shippingKey = shippingAddressKey(order);
+      const current = customerShipping.get(shippingKey);
+      if (!current || shippingScore(order) > shippingScore(current)) {
+        customerShipping.set(shippingKey, order);
+      }
+      shippingByCustomer.set(customerKey(order), customerShipping);
     }
   });
 
   orders
     .filter((order) => !order.processedAt)
     .forEach((order) => {
-      const key = customerKey(order);
+      const effectiveOrder = { ...order };
+      fillMissingShipping(effectiveOrder, bestShippingByOrderGroup.get(`${customerKey(order)}|${order.orderGroup}`));
+
+      const customerShipping = shippingByCustomer.get(customerKey(order));
+      if (!hasShippingAddress(effectiveOrder) && customerShipping?.size === 1) {
+        fillMissingShipping(effectiveOrder, Array.from(customerShipping.values())[0]);
+      }
+
+      const key = `${customerKey(order)}|${shippingAddressKey(effectiveOrder)}`;
       const existing =
         groups.get(key) ||
         ({
-          ...order,
+          ...effectiveOrder,
+          groupKey: key,
           orderGroups: new Set<string>(),
           orderIds: [],
           items: [],
           dateText: "",
         } satisfies ProcessOrderRow);
-      fillMissingShipping(existing, bestShippingByCustomer.get(key));
+      fillMissingShipping(existing, effectiveOrder);
       existing.orderGroups.add(order.orderGroup);
       existing.orderIds.push(order.orderId);
       existing.items.push({
@@ -830,7 +863,7 @@ export default function PepCustomersPage() {
             <table className="data-table ops-table">
               <thead>
                 <tr>
-                  <th>Date of Order</th><th>Customer Name</th><th>Customer ID</th><th>Order #</th><th>Actions</th>
+                  <th>Date of Order</th><th>Customer Name</th><th>Customer ID</th><th>Order #</th><th>Shipping Address</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -838,11 +871,12 @@ export default function PepCustomersPage() {
                   const mainOrders = Array.from(order.orderGroups).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
                   const allOrderIds = Array.from(new Set(order.orderIds)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
                   return (
-                    <tr key={order.customerId}>
+                    <tr key={order.groupKey}>
                       <td>{order.dateText}</td>
                       <td><strong>{order.customerName}</strong></td>
                       <td>{order.customerId}</td>
                       <td title={allOrderIds.join(", ")}>{mainOrders.join(", ")}</td>
+                      <td>{addressText(order)}</td>
                       <td>
                         <div className="table-action-row">
                           <button className="action-button ghost" type="button" onClick={() => void copyProcessOrder(order)}>Copy Order</button>
@@ -851,7 +885,7 @@ export default function PepCustomersPage() {
                       </td>
                     </tr>
                   );
-                }) : <tr><td colSpan={5}>No pending orders to process.</td></tr>}
+                }) : <tr><td colSpan={6}>No pending orders to process.</td></tr>}
               </tbody>
             </table>
           </div>
