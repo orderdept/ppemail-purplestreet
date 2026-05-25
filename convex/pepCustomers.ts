@@ -69,7 +69,16 @@ export const upsertOrders = mutation({
       };
 
       if (existing) {
-        await ctx.db.patch(existing._id, row);
+        await ctx.db.patch(existing._id, {
+          ...row,
+          company: row.company || existing.company || "",
+          address: row.address || existing.address || "",
+          address2: row.address2 || existing.address2 || "",
+          city: row.city || existing.city || "",
+          state: row.state || existing.state || "",
+          zipcode: row.zipcode || existing.zipcode || "",
+          country: row.country || existing.country || "",
+        });
         updated += 1;
       } else {
         await ctx.db.insert("pepCustomerOrders", row);

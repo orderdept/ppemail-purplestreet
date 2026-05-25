@@ -57,6 +57,10 @@ type ProcessOrderRow = OrderRow & {
   dateText: string;
 };
 
+type ShippingField = "company" | "address" | "address2" | "city" | "state" | "zipcode";
+
+const shippingFields: ShippingField[] = ["company", "address", "address2", "city", "state", "zipcode"];
+
 const requiredColumns = {
   orderId: ["order_id", "orderid", "order"],
   orderDate: ["order_date", "date_created", "date"],
@@ -215,6 +219,36 @@ function compareOrders(a: OrderRow, b: OrderRow, key: OrderSortKey, direction: S
   return String(aValue).localeCompare(String(bValue), undefined, { numeric: true }) * multiplier;
 }
 
+function customerKey(order: OrderRow) {
+  return order.customerId || order.email || `${order.customerName}-${order.zipcode}`;
+}
+
+function customerLookupKeys(order: OrderRow) {
+  return Array.from(
+    new Set(
+      [
+        order.customerId,
+        order.email.toLowerCase(),
+        order.customerName.toLowerCase(),
+        `${order.customerName.toLowerCase()}-${order.zipcode}`,
+      ].filter(Boolean),
+    ),
+  );
+}
+
+function shippingScore(order: Pick<OrderRow, ShippingField>) {
+  return (order.address ? 4 : 0) + (order.city ? 2 : 0) + (order.state ? 1 : 0) + (order.zipcode ? 2 : 0) + (order.company ? 1 : 0);
+}
+
+function fillMissingShipping(target: Pick<OrderRow, ShippingField>, source?: Pick<OrderRow, ShippingField>) {
+  if (!source) return;
+  shippingFields.forEach((field) => {
+    if (!target[field] && source[field]) {
+      target[field] = source[field];
+    }
+  });
+}
+
 function addressLabel(order: OrderRow | CustomerRow | ProcessOrderRow) {
   const cityStateZip = [[order.city, order.state].filter(Boolean).join(", "), order.zipcode]
     .filter(Boolean)
@@ -234,10 +268,21 @@ function addressLabel(order: OrderRow | CustomerRow | ProcessOrderRow) {
 
 function processOrderGroups(orders: OrderRow[]) {
   const groups = new Map<string, ProcessOrderRow>();
+  const bestShippingByCustomer = new Map<string, OrderRow>();
+
+  orders.forEach((order) => {
+    customerLookupKeys(order).forEach((key) => {
+      const existing = bestShippingByCustomer.get(key);
+      if (!existing || shippingScore(order) > shippingScore(existing)) {
+        bestShippingByCustomer.set(key, order);
+      }
+    });
+  });
+
   orders
     .filter((order) => !order.processedAt)
     .forEach((order) => {
-      const key = order.customerId || order.email || `${order.customerName}-${order.zipcode}`;
+      const key = customerKey(order);
       const existing =
         groups.get(key) ||
         ({
@@ -247,6 +292,11 @@ function processOrderGroups(orders: OrderRow[]) {
           items: [],
           dateText: "",
         } satisfies ProcessOrderRow);
+      const bestShipping = customerLookupKeys(order)
+        .map((lookupKey) => bestShippingByCustomer.get(lookupKey))
+        .filter((source): source is OrderRow => Boolean(source))
+        .sort((a, b) => shippingScore(b) - shippingScore(a))[0];
+      fillMissingShipping(existing, bestShipping);
       existing.orderGroups.add(order.orderGroup);
       existing.orderIds.push(order.orderId);
       existing.items.push({
