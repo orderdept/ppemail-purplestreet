@@ -687,6 +687,22 @@ h1 {
   opacity: 0.6;
 }
 
+.inline-copy-button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+}
+
+.inline-copy-button:hover {
+  color: var(--accent);
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

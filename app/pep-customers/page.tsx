@@ -102,7 +102,6 @@ type OrderSortKey =
   | "price"
   | "profit"
   | "customerName"
-  | "email"
   | "customerId"
   | "status";
 
@@ -491,6 +490,23 @@ function downloadCsv(rows: Array<{ firstName: string; email: string; customerNam
   URL.revokeObjectURL(url);
 }
 
+async function writeClipboardText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.style.left = "-9999px";
+    field.style.position = "fixed";
+    document.body.append(field);
+    field.select();
+    document.execCommand("copy");
+    field.remove();
+  }
+}
+
 export default function PepCustomersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("customers");
@@ -654,14 +670,23 @@ export default function PepCustomersPage() {
 
   async function copyAddress(order: OrderRow) {
     const label = addressLabel(order);
-    await navigator.clipboard.writeText(label);
+    await writeClipboardText(label);
     setCopyStatus(`Copied address for ${order.customerName}.`);
   }
 
   async function copyProcessOrder(order: ProcessOrderRow) {
     const label = addressLabel(order);
-    await navigator.clipboard.writeText(label);
+    await writeClipboardText(label);
     setProcessStatus(`Copied order for ${order.customerName}.`);
+  }
+
+  async function copyOrderEmail(order: OrderRow) {
+    if (!order.email) {
+      setCopyStatus(`No email address saved for ${order.customerName}.`);
+      return;
+    }
+    await writeClipboardText(order.email);
+    setCopyStatus(`Copied email for ${order.customerName}: ${order.email}`);
   }
 
   function openTrackingDialog(order: ProcessOrderRow) {
@@ -856,7 +881,6 @@ export default function PepCustomersPage() {
                   <th>{sortableHeader("price", "Price")}</th>
                   <th>{sortableHeader("profit", "Profit")}</th>
                   <th>{sortableHeader("customerName", "Customer")}</th>
-                  <th>{sortableHeader("email", "Email")}</th>
                   <th>{sortableHeader("customerId", "Customer ID")}</th>
                   <th>{sortableHeader("status", "Status")}</th>
                 </tr>
@@ -872,15 +896,19 @@ export default function PepCustomersPage() {
                     <td>{moneyFormatter.format(order.cost)}</td>
                     <td>{moneyFormatter.format(order.price)}</td>
                     <td>{moneyFormatter.format(order.profit)}</td>
-                    <td title={addressText(order)}>{order.customerName}</td>
-                    <td>{order.email}</td>
+                    <td>
+                      <button className="inline-copy-button" onClick={() => void copyOrderEmail(order)} title={order.email} type="button">
+                        {order.customerName}
+                      </button>
+                    </td>
                     <td>{order.customerId}</td>
                     <td><span className={`status-chip ${order.processedAt ? "ready" : "duplicate"}`}>{order.processedAt ? "Sent" : "Pending"}</span></td>
                   </tr>
-                )) : <tr><td colSpan={12}>No matching orders.</td></tr>}
+                )) : <tr><td colSpan={11}>No matching orders.</td></tr>}
               </tbody>
             </table>
           </div>
+          {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
         </section>
       ) : null}
 
@@ -959,8 +987,9 @@ export default function PepCustomersPage() {
                 className="action-button ghost"
                 type="button"
                 onClick={() => {
-                  void navigator.clipboard.writeText(exportCustomers.map((row) => row.email).join("\n"));
-                  setCopyStatus(`Copied ${exportCustomers.length} email${exportCustomers.length === 1 ? "" : "s"}.`);
+                  void writeClipboardText(exportCustomers.map((row) => row.email).join("\n")).then(() => {
+                    setCopyStatus(`Copied ${exportCustomers.length} email${exportCustomers.length === 1 ? "" : "s"}.`);
+                  });
                 }}
               >
                 Copy emails
