@@ -103,8 +103,7 @@ type OrderSortKey =
   | "customerName"
   | "email"
   | "customerId"
-  | "status"
-  | "address";
+  | "status";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -220,7 +219,6 @@ function hasShippingAddress(order: Pick<OrderRow, "address" | "city" | "state" |
 function sortValue(order: OrderRow, key: OrderSortKey) {
   if (key === "qty" || key === "cost" || key === "price" || key === "profit") return order[key];
   if (key === "status") return order.processedAt ? "sent" : "pending";
-  if (key === "address") return addressText(order).toLowerCase();
   return cleanText(order[key]).toLowerCase();
 }
 
@@ -823,7 +821,6 @@ export default function PepCustomersPage() {
                   <th>{sortableHeader("email", "Email")}</th>
                   <th>{sortableHeader("customerId", "Customer ID")}</th>
                   <th>{sortableHeader("status", "Status")}</th>
-                  <th>{sortableHeader("address", "Address")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -837,13 +834,12 @@ export default function PepCustomersPage() {
                     <td>{moneyFormatter.format(order.cost)}</td>
                     <td>{moneyFormatter.format(order.price)}</td>
                     <td>{moneyFormatter.format(order.profit)}</td>
-                    <td>{order.customerName}<br /><small>{order.firstName}</small></td>
+                    <td title={addressText(order)}>{order.customerName}</td>
                     <td>{order.email}</td>
                     <td>{order.customerId}</td>
                     <td><span className={`status-chip ${order.processedAt ? "ready" : "duplicate"}`}>{order.processedAt ? "Sent" : "Pending"}</span></td>
-                    <td>{addressText(order)}</td>
                   </tr>
-                )) : <tr><td colSpan={13}>No matching orders.</td></tr>}
+                )) : <tr><td colSpan={12}>No matching orders.</td></tr>}
               </tbody>
             </table>
           </div>
