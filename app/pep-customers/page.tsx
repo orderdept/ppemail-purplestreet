@@ -50,20 +50,20 @@ type CustomerRow = OrderRow & {
 
 const requiredColumns = {
   orderId: ["order_id", "orderid", "order"],
-  orderDate: ["order_date", "date"],
+  orderDate: ["order_date", "date_created", "date"],
   sku: ["sku"],
   brand: ["brand"],
   qty: ["qty", "quantity"],
-  cost: ["cost"],
+  cost: ["cost", "supplier_payout"],
   price: ["price"],
   customerName: ["customer_name", "customer"],
-  company: ["company"],
-  address: ["address", "address1", "address_1"],
-  address2: ["address2", "address_2"],
-  city: ["city"],
-  state: ["state"],
-  zipcode: ["zipcode", "zip", "postal_code"],
-  country: ["country"],
+  company: ["company", "shipping_company"],
+  address: ["address", "address1", "address_1", "shipping_address1", "shipping_address_1"],
+  address2: ["address2", "address_2", "shipping_address2", "shipping_address_2"],
+  city: ["city", "shipping_city"],
+  state: ["state", "shipping_state"],
+  zipcode: ["zipcode", "zip", "postal_code", "shipping_zip"],
+  country: ["country", "shipping_country"],
   email: ["email", "email_address"],
   customerId: ["customer_id", "customerid"],
 } as const;
@@ -147,6 +147,18 @@ function productDoseLabel(item: { productName: string; sku: string; dose?: strin
   return [productLabel(item.productName || item.sku), cleanText(item.dose)].filter(Boolean).join(" ");
 }
 
+function doseFromProductName(value: unknown) {
+  const text = cleanText(value);
+  const bundleDose = text.match(/\b\d+\s*x\s*(\d+(?:\.\d+)?\s*mg)\b/i)?.[1];
+  const anyDose = text.match(/\b(\d+(?:\.\d+)?\s*mg)\b/i)?.[1];
+  return cleanText(bundleDose || anyDose).replace(/\s+/g, "");
+}
+
+function qtyFromProductName(value: unknown) {
+  const bundleQty = cleanText(value).match(/\b(\d+)\s*x\s*\d+(?:\.\d+)?\s*mg\b/i)?.[1];
+  return bundleQty ? Number(bundleQty) : 0;
+}
+
 function dateSearchText(value: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return value;
@@ -220,22 +232,24 @@ function importOrders(rows: unknown[][]) {
       if (!orderId || !customerName) return null;
       const cost = parseMoney(cell(row, columns, "cost"));
       const price = parseMoney(cell(row, columns, "price"));
+      const rawProductName =
+        cleanText(optionalCell(row, optional, "productName")) ||
+        cleanText(optionalCell(row, optional, "ingredient")) ||
+        cleanText(cell(row, columns, "brand"));
+      const productName = productLabel(rawProductName) || cleanText(cell(row, columns, "sku"));
+      const columnQty = Number(cell(row, columns, "qty")) || 0;
+      const bundleQty = qtyFromProductName(rawProductName);
+      const quantity = bundleQty > 1 && columnQty <= 1 ? bundleQty : columnQty || bundleQty || 0;
       return {
         id: `${orderId}-${index}`,
         orderId,
         orderGroup: orderGroup(orderId),
         orderDate: formatDate(cell(row, columns, "orderDate")),
         sku: cleanText(cell(row, columns, "sku")),
-        productName:
-          productLabel(
-            cleanText(optionalCell(row, optional, "productName")) ||
-              cleanText(optionalCell(row, optional, "ingredient")) ||
-              cleanText(cell(row, columns, "brand"))
-          ) ||
-          cleanText(cell(row, columns, "sku")),
-        dose: cleanText(optionalCell(row, optional, "dose")),
-        brand: glpBrand(cell(row, columns, "brand")),
-        qty: Number(cell(row, columns, "qty")) || 0,
+        productName,
+        dose: cleanText(optionalCell(row, optional, "dose")) || doseFromProductName(rawProductName),
+        brand: glpBrand(cell(row, columns, "brand")) || productName,
+        qty: quantity,
         cost,
         price,
         profit: price - cost,
