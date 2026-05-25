@@ -22,7 +22,8 @@ function cleanOrder(value: unknown): PepCustomerOrder | null {
 
   const orderId = cleanText(row.orderId);
   const customerName = cleanText(row.customerName);
-  if (!orderId || !customerName) return null;
+  const customerId = cleanText(row.customerId);
+  if (!orderId || !customerName || !customerId) return null;
 
   const cost = cleanMoney(row.cost);
   const price = cleanMoney(row.price);
@@ -51,7 +52,7 @@ function cleanOrder(value: unknown): PepCustomerOrder | null {
     zipcode: cleanText(row.zipcode),
     country: cleanText(row.country),
     email: cleanText(row.email).toLowerCase(),
-    customerId: cleanText(row.customerId),
+    customerId,
     trackingNumber: cleanText(row.trackingNumber),
     processedAt: cleanText(row.processedAt),
   };

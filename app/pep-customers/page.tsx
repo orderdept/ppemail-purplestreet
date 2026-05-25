@@ -220,20 +220,7 @@ function compareOrders(a: OrderRow, b: OrderRow, key: OrderSortKey, direction: S
 }
 
 function customerKey(order: OrderRow) {
-  return order.customerId || order.email || `${order.customerName}-${order.zipcode}`;
-}
-
-function customerLookupKeys(order: OrderRow) {
-  return Array.from(
-    new Set(
-      [
-        order.customerId,
-        order.email.toLowerCase(),
-        order.customerName.toLowerCase(),
-        `${order.customerName.toLowerCase()}-${order.zipcode}`,
-      ].filter(Boolean),
-    ),
-  );
+  return order.customerId;
 }
 
 function shippingScore(order: Pick<OrderRow, ShippingField>) {
@@ -271,12 +258,11 @@ function processOrderGroups(orders: OrderRow[]) {
   const bestShippingByCustomer = new Map<string, OrderRow>();
 
   orders.forEach((order) => {
-    customerLookupKeys(order).forEach((key) => {
-      const existing = bestShippingByCustomer.get(key);
-      if (!existing || shippingScore(order) > shippingScore(existing)) {
-        bestShippingByCustomer.set(key, order);
-      }
-    });
+    const key = customerKey(order);
+    const existing = bestShippingByCustomer.get(key);
+    if (!existing || shippingScore(order) > shippingScore(existing)) {
+      bestShippingByCustomer.set(key, order);
+    }
   });
 
   orders
@@ -292,11 +278,7 @@ function processOrderGroups(orders: OrderRow[]) {
           items: [],
           dateText: "",
         } satisfies ProcessOrderRow);
-      const bestShipping = customerLookupKeys(order)
-        .map((lookupKey) => bestShippingByCustomer.get(lookupKey))
-        .filter((source): source is OrderRow => Boolean(source))
-        .sort((a, b) => shippingScore(b) - shippingScore(a))[0];
-      fillMissingShipping(existing, bestShipping);
+      fillMissingShipping(existing, bestShippingByCustomer.get(key));
       existing.orderGroups.add(order.orderGroup);
       existing.orderIds.push(order.orderId);
       existing.items.push({
@@ -364,7 +346,8 @@ function importOrders(rows: unknown[][]) {
     .map((row, index): OrderRow | null => {
       const orderId = cleanText(cell(row, columns, "orderId"));
       const customerName = cleanText(cell(row, columns, "customerName"));
-      if (!orderId || !customerName) return null;
+      const customerId = cleanText(cell(row, columns, "customerId"));
+      if (!orderId || !customerName || !customerId) return null;
       const cost = parseMoney(cell(row, columns, "cost"));
       const price = parseMoney(cell(row, columns, "price"));
       const rawProductName =
@@ -399,7 +382,7 @@ function importOrders(rows: unknown[][]) {
         zipcode: cleanText(cell(row, columns, "zipcode")),
         country: cleanText(cell(row, columns, "country")),
         email: cleanText(cell(row, columns, "email")).toLowerCase(),
-        customerId: cleanText(cell(row, columns, "customerId")),
+        customerId,
         trackingNumber: "",
         processedAt: "",
       };
@@ -410,7 +393,7 @@ function importOrders(rows: unknown[][]) {
 function customerGroups(orders: OrderRow[]) {
   const groups = new Map<string, CustomerRow>();
   orders.forEach((order) => {
-    const key = order.customerId || order.email || `${order.customerName}-${order.zipcode}`;
+    const key = customerKey(order);
     const existing =
       groups.get(key) ||
       ({
@@ -529,8 +512,8 @@ export default function PepCustomersPage() {
   const exportCustomers = useMemo(() => {
     const rows = new Map<string, { firstName: string; email: string; customerName: string; customerId: string }>();
     exportSource.forEach((order) => {
-      if (!order.email || rows.has(order.email)) return;
-      rows.set(order.email, {
+      if (!order.customerId || rows.has(order.customerId)) return;
+      rows.set(order.customerId, {
         firstName: order.firstName,
         email: order.email,
         customerName: order.customerName,
@@ -744,7 +727,7 @@ export default function PepCustomersPage() {
               </thead>
               <tbody>
                 {customers.length ? customers.map((customer) => (
-                  <tr key={customer.customerId || customer.email}>
+                  <tr key={customer.customerId}>
                     <td><strong>{customer.customerName}</strong></td>
                     <td>{customer.email}</td>
                     <td>{customer.customerId}</td>
@@ -855,7 +838,7 @@ export default function PepCustomersPage() {
                   const mainOrders = Array.from(order.orderGroups).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
                   const allOrderIds = Array.from(new Set(order.orderIds)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
                   return (
-                    <tr key={order.customerId || order.email || order.customerName}>
+                    <tr key={order.customerId}>
                       <td>{order.dateText}</td>
                       <td><strong>{order.customerName}</strong></td>
                       <td>{order.customerId}</td>
