@@ -981,6 +981,41 @@ h1 {
   text-transform: uppercase;
 }
 
+.sortable-header {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  gap: 6px;
+  letter-spacing: inherit;
+  padding: 0;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+.sortable-header:hover {
+  color: var(--accent);
+}
+
+.sort-indicator {
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 6px;
+  text-transform: none;
+}
+
 .ops-table th,
 .ops-table td {
   white-space: nowrap;

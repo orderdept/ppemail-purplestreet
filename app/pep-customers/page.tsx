@@ -77,6 +77,19 @@ const optionalColumns = {
 type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
 type TabKey = "customers" | "orders" | "import" | "export";
+type SortDirection = "asc" | "desc";
+type OrderSortKey =
+  | "orderId"
+  | "orderDate"
+  | "brand"
+  | "qty"
+  | "cost"
+  | "price"
+  | "profit"
+  | "customerName"
+  | "email"
+  | "customerId"
+  | "address";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -164,6 +177,31 @@ function dateSearchText(value: string) {
   if (!match) return value;
   const [, year, month, day] = match;
   return `${value} ${Number(month)}/${Number(day)}/${year} ${Number(month)}/${Number(day)}/${year.slice(2)}`;
+}
+
+function displayDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+  const [, year, month, day] = match;
+  return `${month}/${day}/${year.slice(2)}`;
+}
+
+function addressText(order: OrderRow) {
+  return [order.address, order.address2, order.city, order.state, order.zipcode].filter(Boolean).join(", ");
+}
+
+function sortValue(order: OrderRow, key: OrderSortKey) {
+  if (key === "qty" || key === "cost" || key === "price" || key === "profit") return order[key];
+  if (key === "address") return addressText(order).toLowerCase();
+  return cleanText(order[key]).toLowerCase();
+}
+
+function compareOrders(a: OrderRow, b: OrderRow, key: OrderSortKey, direction: SortDirection) {
+  const aValue = sortValue(a, key);
+  const bValue = sortValue(b, key);
+  const multiplier = direction === "asc" ? 1 : -1;
+  if (typeof aValue === "number" && typeof bValue === "number") return (aValue - bValue) * multiplier;
+  return String(aValue).localeCompare(String(bValue), undefined, { numeric: true }) * multiplier;
 }
 
 function addressLabel(order: OrderRow | CustomerRow) {
@@ -332,6 +370,7 @@ export default function PepCustomersPage() {
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
+  const [orderSort, setOrderSort] = useState<{ key: OrderSortKey; direction: SortDirection } | null>(null);
   const [exportStartOrderId, setExportStartOrderId] = useState("");
   const [exportEndOrderId, setExportEndOrderId] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
@@ -354,6 +393,10 @@ export default function PepCustomersPage() {
       }),
     [brand, date, orders, search]
   );
+  const visibleOrders = useMemo(() => {
+    if (!orderSort) return filteredOrders;
+    return [...filteredOrders].sort((a, b) => compareOrders(a, b, orderSort.key, orderSort.direction));
+  }, [filteredOrders, orderSort]);
   const customers = useMemo(() => customerGroups(filteredOrders), [filteredOrders]);
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
@@ -477,6 +520,23 @@ export default function PepCustomersPage() {
     setCopyStatus(`Copied address for ${order.customerName}.`);
   }
 
+  function toggleOrderSort(key: OrderSortKey) {
+    setOrderSort((current) => {
+      if (!current || current.key !== key) return { key, direction: "asc" };
+      return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+    });
+  }
+
+  function sortableHeader(key: OrderSortKey, label: string) {
+    const active = orderSort?.key === key;
+    return (
+      <button className="sortable-header" onClick={() => toggleOrderSort(key)} type="button">
+        <span>{label}</span>
+        {active ? <span className="sort-indicator">{orderSort.direction === "asc" ? "Asc" : "Desc"}</span> : null}
+      </button>
+    );
+  }
+
   const tabs: Array<{ key: TabKey; label: string }> = [
     { key: "customers", label: "Customers" },
     { key: "orders", label: "Orders" },
@@ -569,7 +629,7 @@ export default function PepCustomersPage() {
               <p>Search by order ID, first 5 digits, last name, Customer ID, email address, or order date.</p>
             </div>
             <div className="page-top-actions">
-              <button className="action-button" type="button" onClick={() => setSelected(new Set(filteredOrders.map((order) => order.id)))}>Select visible</button>
+              <button className="action-button" type="button" onClick={() => setSelected(new Set(visibleOrders.map((order) => order.id)))}>Select visible</button>
               <button className="action-button ghost" type="button" onClick={() => setSelected(new Set())}>Clear selection</button>
             </div>
           </div>
@@ -594,15 +654,26 @@ export default function PepCustomersPage() {
             <table className="data-table ops-table">
               <thead>
                 <tr>
-                  <th>Select</th><th>Order ID</th><th>Date</th><th>Brand</th><th>Qty</th><th>Cost</th><th>Price</th><th>Profit</th><th>Customer</th><th>Email</th><th>Customer ID</th><th>Address</th>
+                  <th>Select</th>
+                  <th>{sortableHeader("orderId", "Order ID")}</th>
+                  <th>{sortableHeader("orderDate", "Date")}</th>
+                  <th>{sortableHeader("brand", "Brand")}</th>
+                  <th>{sortableHeader("qty", "Qty")}</th>
+                  <th>{sortableHeader("cost", "Cost")}</th>
+                  <th>{sortableHeader("price", "Price")}</th>
+                  <th>{sortableHeader("profit", "Profit")}</th>
+                  <th>{sortableHeader("customerName", "Customer")}</th>
+                  <th>{sortableHeader("email", "Email")}</th>
+                  <th>{sortableHeader("customerId", "Customer ID")}</th>
+                  <th>{sortableHeader("address", "Address")}</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.length ? filteredOrders.map((order) => (
+                {visibleOrders.length ? visibleOrders.map((order) => (
                   <tr key={order.id}>
                     <td><input type="checkbox" checked={selected.has(order.id)} onChange={(event) => toggleSelected(order.id, event.target.checked)} /></td>
                     <td><strong>{order.orderId}</strong><br /><small>{order.orderGroup}</small></td>
-                    <td>{order.orderDate}</td>
+                    <td>{displayDate(order.orderDate)}</td>
                     <td><span className="status-chip ready">{order.brand}</span></td>
                     <td>{order.qty}</td>
                     <td>{moneyFormatter.format(order.cost)}</td>
@@ -611,7 +682,7 @@ export default function PepCustomersPage() {
                     <td>{order.customerName}<br /><small>{order.firstName}</small></td>
                     <td>{order.email}</td>
                     <td>{order.customerId}</td>
-                    <td>{[order.address, order.address2, order.city, order.state, order.zipcode].filter(Boolean).join(", ")}</td>
+                    <td>{addressText(order)}</td>
                   </tr>
                 )) : <tr><td colSpan={12}>No matching orders.</td></tr>}
               </tbody>
