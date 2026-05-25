@@ -92,6 +92,7 @@ type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
 type TabKey = "customers" | "orders" | "process" | "import" | "export";
 type SortDirection = "asc" | "desc";
+type ProcessSortKey = "orderDate" | "orderGroup";
 type OrderSortKey =
   | "orderId"
   | "orderDate"
@@ -225,6 +226,21 @@ function sortValue(order: OrderRow, key: OrderSortKey) {
 function compareOrders(a: OrderRow, b: OrderRow, key: OrderSortKey, direction: SortDirection) {
   const aValue = sortValue(a, key);
   const bValue = sortValue(b, key);
+  const multiplier = direction === "asc" ? 1 : -1;
+  if (typeof aValue === "number" && typeof bValue === "number") return (aValue - bValue) * multiplier;
+  return String(aValue).localeCompare(String(bValue), undefined, { numeric: true }) * multiplier;
+}
+
+function processSortValue(order: ProcessOrderRow, key: ProcessSortKey) {
+  if (key === "orderGroup") {
+    return Math.min(...Array.from(order.orderGroups).map((group) => orderGroupNumber(group) || Number.MAX_SAFE_INTEGER));
+  }
+  return order.orderDate;
+}
+
+function compareProcessOrders(a: ProcessOrderRow, b: ProcessOrderRow, key: ProcessSortKey, direction: SortDirection) {
+  const aValue = processSortValue(a, key);
+  const bValue = processSortValue(b, key);
   const multiplier = direction === "asc" ? 1 : -1;
   if (typeof aValue === "number" && typeof bValue === "number") return (aValue - bValue) * multiplier;
   return String(aValue).localeCompare(String(bValue), undefined, { numeric: true }) * multiplier;
@@ -484,6 +500,7 @@ export default function PepCustomersPage() {
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
   const [orderSort, setOrderSort] = useState<{ key: OrderSortKey; direction: SortDirection } | null>(null);
+  const [processSort, setProcessSort] = useState<{ key: ProcessSortKey; direction: SortDirection } | null>(null);
   const [exportStartOrderId, setExportStartOrderId] = useState("");
   const [exportEndOrderId, setExportEndOrderId] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
@@ -515,6 +532,10 @@ export default function PepCustomersPage() {
   }, [filteredOrders, orderSort]);
   const customers = useMemo(() => customerGroups(filteredOrders), [filteredOrders]);
   const processOrders = useMemo(() => processOrderGroups(orders), [orders]);
+  const visibleProcessOrders = useMemo(() => {
+    if (!processSort) return processOrders;
+    return [...processOrders].sort((a, b) => compareProcessOrders(a, b, processSort.key, processSort.direction));
+  }, [processOrders, processSort]);
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
   const profit = orders.reduce((sum, order) => sum + order.profit, 0);
@@ -692,12 +713,29 @@ export default function PepCustomersPage() {
     );
   }
 
+  function toggleProcessSort(key: ProcessSortKey) {
+    setProcessSort((current) => {
+      if (!current || current.key !== key) return { key, direction: "asc" };
+      return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+    });
+  }
+
+  function processSortableHeader(key: ProcessSortKey, label: string) {
+    const active = processSort?.key === key;
+    return (
+      <button className="sortable-header" onClick={() => toggleProcessSort(key)} type="button">
+        <span>{label}</span>
+        {active ? <span className="sort-indicator">{processSort.direction === "asc" ? "Asc" : "Desc"}</span> : null}
+      </button>
+    );
+  }
+
   const tabs: Array<{ key: TabKey; label: string }> = [
     { key: "customers", label: "Customers" },
     { key: "orders", label: "Orders" },
-    { key: "process", label: "Process Orders" },
     { key: "import", label: "Import" },
     { key: "export", label: "Export" },
+    { key: "process", label: "Process Orders" },
   ];
 
   return (
@@ -859,11 +897,16 @@ export default function PepCustomersPage() {
             <table className="data-table ops-table">
               <thead>
                 <tr>
-                  <th>Date of Order</th><th>Customer Name</th><th>Customer ID</th><th>Order #</th><th>Shipping Address</th><th>Actions</th>
+                  <th>{processSortableHeader("orderDate", "Date of Order")}</th>
+                  <th>Customer Name</th>
+                  <th>Customer ID</th>
+                  <th>{processSortableHeader("orderGroup", "Order #")}</th>
+                  <th>Shipping Address</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {processOrders.length ? processOrders.map((order) => {
+                {visibleProcessOrders.length ? visibleProcessOrders.map((order) => {
                   const mainOrders = Array.from(order.orderGroups).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
                   const allOrderIds = Array.from(new Set(order.orderIds)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
                   return (
