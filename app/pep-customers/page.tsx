@@ -603,7 +603,7 @@ export default function PepCustomersPage() {
               <tbody>
                 {customers.length ? customers.map((customer) => (
                   <tr key={customer.customerId || customer.email}>
-                    <td><strong>{customer.customerName}</strong><br /><small>{customer.firstName}</small></td>
+                    <td><strong>{customer.customerName}</strong></td>
                     <td>{customer.email}</td>
                     <td>{customer.customerId}</td>
                     <td>{customer.orderGroups.size} orders<br /><small>{Array.from(customer.orderGroups).sort().join(", ")} · {customer.lineCount} lines</small></td>
@@ -672,7 +672,7 @@ export default function PepCustomersPage() {
                 {visibleOrders.length ? visibleOrders.map((order) => (
                   <tr key={order.id}>
                     <td><input type="checkbox" checked={selected.has(order.id)} onChange={(event) => toggleSelected(order.id, event.target.checked)} /></td>
-                    <td><strong>{order.orderId}</strong><br /><small>{order.orderGroup}</small></td>
+                    <td><strong>{order.orderId}</strong></td>
                     <td>{displayDate(order.orderDate)}</td>
                     <td><span className="status-chip ready">{order.brand}</span></td>
                     <td>{order.qty}</td>
