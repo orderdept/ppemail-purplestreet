@@ -225,6 +225,8 @@ export type PepCustomerOrder = {
   country: string;
   email: string;
   customerId: string;
+  trackingNumber: string;
+  processedAt: string;
 };
 
 type ConvexPepCustomerOrder = Omit<PepCustomerOrder, "id"> & {
@@ -257,6 +259,8 @@ function toPepCustomerOrder(row: ConvexPepCustomerOrder): PepCustomerOrder {
     country: row.country,
     email: row.email,
     customerId: row.customerId,
+    trackingNumber: row.trackingNumber || "",
+    processedAt: row.processedAt || "",
   };
 }
 
@@ -276,11 +280,23 @@ export async function upsertConvexPepCustomerOrders(orders: PepCustomerOrder[], 
   if (!client) {
     throw new Error("Convex is not configured.");
   }
-  const payload = orders.map(({ id: _id, ...order }) => order);
+  const payload = orders.map(({ id: _id, trackingNumber: _trackingNumber, processedAt: _processedAt, ...order }) => order);
   return await client.mutation(api.pepCustomers.upsertOrders, {
     moduleKey: pepCustomersModuleKey,
     sourceFile,
     orders: payload,
+  });
+}
+
+export async function markConvexPepCustomerOrdersProcessed(orderIds: string[], trackingNumber: string) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.pepCustomers.markProcessed, {
+    moduleKey: pepCustomersModuleKey,
+    orderIds,
+    trackingNumber,
   });
 }
 

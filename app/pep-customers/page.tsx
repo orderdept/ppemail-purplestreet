@@ -29,6 +29,8 @@ type OrderRow = {
   country: string;
   email: string;
   customerId: string;
+  trackingNumber: string;
+  processedAt: string;
 };
 
 type OrderItem = {
@@ -46,6 +48,13 @@ type CustomerRow = OrderRow & {
   totalProfit: number;
   lastOrder: string;
   items: OrderItem[];
+};
+
+type ProcessOrderRow = OrderRow & {
+  orderGroups: Set<string>;
+  orderIds: string[];
+  items: OrderItem[];
+  dateText: string;
 };
 
 const requiredColumns = {
@@ -76,7 +85,7 @@ const optionalColumns = {
 
 type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
-type TabKey = "customers" | "orders" | "import" | "export";
+type TabKey = "customers" | "orders" | "process" | "import" | "export";
 type SortDirection = "asc" | "desc";
 type OrderSortKey =
   | "orderId"
@@ -89,6 +98,7 @@ type OrderSortKey =
   | "customerName"
   | "email"
   | "customerId"
+  | "status"
   | "address";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
@@ -192,6 +202,7 @@ function addressText(order: OrderRow) {
 
 function sortValue(order: OrderRow, key: OrderSortKey) {
   if (key === "qty" || key === "cost" || key === "price" || key === "profit") return order[key];
+  if (key === "status") return order.processedAt ? "sent" : "pending";
   if (key === "address") return addressText(order).toLowerCase();
   return cleanText(order[key]).toLowerCase();
 }
@@ -204,7 +215,7 @@ function compareOrders(a: OrderRow, b: OrderRow, key: OrderSortKey, direction: S
   return String(aValue).localeCompare(String(bValue), undefined, { numeric: true }) * multiplier;
 }
 
-function addressLabel(order: OrderRow | CustomerRow) {
+function addressLabel(order: OrderRow | CustomerRow | ProcessOrderRow) {
   const cityStateZip = [[order.city, order.state].filter(Boolean).join(", "), order.zipcode]
     .filter(Boolean)
     .join(" ");
@@ -219,6 +230,42 @@ function addressLabel(order: OrderRow | CustomerRow) {
     .map(cleanText)
     .filter(Boolean)
     .join("\n");
+}
+
+function processOrderGroups(orders: OrderRow[]) {
+  const groups = new Map<string, ProcessOrderRow>();
+  orders
+    .filter((order) => !order.processedAt)
+    .forEach((order) => {
+      const key = order.customerId || order.email || `${order.customerName}-${order.zipcode}`;
+      const existing =
+        groups.get(key) ||
+        ({
+          ...order,
+          orderGroups: new Set<string>(),
+          orderIds: [],
+          items: [],
+          dateText: "",
+        } satisfies ProcessOrderRow);
+      existing.orderGroups.add(order.orderGroup);
+      existing.orderIds.push(order.orderId);
+      existing.items.push({
+        orderId: order.orderId,
+        productName: order.productName,
+        dose: order.dose,
+        qty: order.qty,
+        sku: order.sku,
+      });
+      existing.dateText = Array.from(new Set([...existing.dateText.split(", ").filter(Boolean), displayDate(order.orderDate)]))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        .join(", ");
+      groups.set(key, existing);
+    });
+
+  return Array.from(groups.values()).sort((a, b) => {
+    const dateCompare = a.orderDate.localeCompare(b.orderDate);
+    return dateCompare || a.customerName.localeCompare(b.customerName);
+  });
 }
 
 function findColumns(headers: unknown[]) {
@@ -303,6 +350,8 @@ function importOrders(rows: unknown[][]) {
         country: cleanText(cell(row, columns, "country")),
         email: cleanText(cell(row, columns, "email")).toLowerCase(),
         customerId: cleanText(cell(row, columns, "customerId")),
+        trackingNumber: "",
+        processedAt: "",
       };
     })
     .filter((order): order is OrderRow => Boolean(order));
@@ -374,6 +423,9 @@ export default function PepCustomersPage() {
   const [exportStartOrderId, setExportStartOrderId] = useState("");
   const [exportEndOrderId, setExportEndOrderId] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
+  const [trackingOrder, setTrackingOrder] = useState<ProcessOrderRow | null>(null);
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [processStatus, setProcessStatus] = useState("");
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
   const filteredOrders = useMemo(
@@ -398,6 +450,7 @@ export default function PepCustomersPage() {
     return [...filteredOrders].sort((a, b) => compareOrders(a, b, orderSort.key, orderSort.direction));
   }, [filteredOrders, orderSort]);
   const customers = useMemo(() => customerGroups(filteredOrders), [filteredOrders]);
+  const processOrders = useMemo(() => processOrderGroups(orders), [orders]);
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
   const profit = orders.reduce((sum, order) => sum + order.profit, 0);
@@ -520,6 +573,44 @@ export default function PepCustomersPage() {
     setCopyStatus(`Copied address for ${order.customerName}.`);
   }
 
+  async function copyProcessOrder(order: ProcessOrderRow) {
+    const label = addressLabel(order);
+    await navigator.clipboard.writeText(label);
+    setProcessStatus(`Copied order for ${order.customerName}.`);
+  }
+
+  function openTrackingDialog(order: ProcessOrderRow) {
+    setTrackingOrder(order);
+    setTrackingNumber("");
+    setProcessStatus("");
+  }
+
+  async function submitTrackingNumber() {
+    if (!trackingOrder) return;
+    const tracking = trackingNumber.trim();
+    if (!tracking) {
+      setProcessStatus("Enter a tracking number first.");
+      return;
+    }
+
+    setProcessStatus("Saving tracking number...");
+    try {
+      const response = await fetch("/api/pep-customers/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: trackingOrder.orderIds, trackingNumber: tracking }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Could not process that order.");
+      setOrders(Array.isArray(data.orders) ? data.orders : orders);
+      setTrackingOrder(null);
+      setTrackingNumber("");
+      setProcessStatus(`Marked ${trackingOrder.orderGroups.size} order${trackingOrder.orderGroups.size === 1 ? "" : "s"} as processed.`);
+    } catch (error) {
+      setProcessStatus(error instanceof Error ? error.message : "Could not process that order.");
+    }
+  }
+
   function toggleOrderSort(key: OrderSortKey) {
     setOrderSort((current) => {
       if (!current || current.key !== key) return { key, direction: "asc" };
@@ -540,6 +631,7 @@ export default function PepCustomersPage() {
   const tabs: Array<{ key: TabKey; label: string }> = [
     { key: "customers", label: "Customers" },
     { key: "orders", label: "Orders" },
+    { key: "process", label: "Process Orders" },
     { key: "import", label: "Import" },
     { key: "export", label: "Export" },
   ];
@@ -597,7 +689,7 @@ export default function PepCustomersPage() {
             <table className="data-table ops-table">
               <thead>
                 <tr>
-                  <th>Customer</th><th>Email</th><th>Customer ID</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Last Order</th><th>Label</th>
+                  <th>Customer</th><th>Email</th><th>Customer ID</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Last Order</th>
                 </tr>
               </thead>
               <tbody>
@@ -610,9 +702,8 @@ export default function PepCustomersPage() {
                     <td>{moneyFormatter.format(customer.revenue)}</td>
                     <td>{moneyFormatter.format(customer.totalProfit)}</td>
                     <td>{customer.lastOrder}</td>
-                    <td><button className="action-button ghost" type="button" onClick={() => void copyAddress(customer)}>Copy address</button></td>
                   </tr>
-                )) : <tr><td colSpan={8}>No customers imported yet.</td></tr>}
+                )) : <tr><td colSpan={7}>No customers imported yet.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -665,6 +756,7 @@ export default function PepCustomersPage() {
                   <th>{sortableHeader("customerName", "Customer")}</th>
                   <th>{sortableHeader("email", "Email")}</th>
                   <th>{sortableHeader("customerId", "Customer ID")}</th>
+                  <th>{sortableHeader("status", "Status")}</th>
                   <th>{sortableHeader("address", "Address")}</th>
                 </tr>
               </thead>
@@ -682,12 +774,55 @@ export default function PepCustomersPage() {
                     <td>{order.customerName}<br /><small>{order.firstName}</small></td>
                     <td>{order.email}</td>
                     <td>{order.customerId}</td>
+                    <td><span className={`status-chip ${order.processedAt ? "ready" : "duplicate"}`}>{order.processedAt ? "Sent" : "Pending"}</span></td>
                     <td>{addressText(order)}</td>
                   </tr>
-                )) : <tr><td colSpan={12}>No matching orders.</td></tr>}
+                )) : <tr><td colSpan={13}>No matching orders.</td></tr>}
               </tbody>
             </table>
           </div>
+        </section>
+      ) : null}
+
+      {activeTab === "process" ? (
+        <section className="panel top-gap">
+          <div className="section-head">
+            <div>
+              <p className="section-step">Process Orders</p>
+              <h2>Pending Shipments</h2>
+              <p>Copy the order label, then enter tracking to mark the order as processed.</p>
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table ops-table">
+              <thead>
+                <tr>
+                  <th>Date of Order</th><th>Customer Name</th><th>Customer ID</th><th>Order #</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processOrders.length ? processOrders.map((order) => {
+                  const mainOrders = Array.from(order.orderGroups).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+                  const allOrderIds = Array.from(new Set(order.orderIds)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+                  return (
+                    <tr key={order.customerId || order.email || order.customerName}>
+                      <td>{order.dateText}</td>
+                      <td><strong>{order.customerName}</strong></td>
+                      <td>{order.customerId}</td>
+                      <td title={allOrderIds.join(", ")}>{mainOrders.join(", ")}</td>
+                      <td>
+                        <div className="table-action-row">
+                          <button className="action-button ghost" type="button" onClick={() => void copyProcessOrder(order)}>Copy Order</button>
+                          <button className="action-button" type="button" onClick={() => openTrackingDialog(order)}>Tracking</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : <tr><td colSpan={5}>No pending orders to process.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          {processStatus ? <small className="inline-status">{processStatus}</small> : null}
         </section>
       ) : null}
 
@@ -750,6 +885,26 @@ export default function PepCustomersPage() {
           {copyStatus ? <small className="inline-status">{copyStatus}</small> : null}
           <pre className="log-box top-gap">{exportCustomers.slice(0, 12).map((row) => `${row.firstName},${row.email}`).join("\n") || "Imported customer list exports will preview here."}</pre>
         </section>
+      ) : null}
+
+      {trackingOrder ? (
+        <div className="modal-backdrop" role="presentation">
+          <div aria-modal="true" className="dialog-panel" role="dialog">
+            <div>
+              <p className="section-step">Tracking</p>
+              <h2>Mark Order Processed</h2>
+              <p className="quiet-note">{trackingOrder.customerName} · {Array.from(trackingOrder.orderGroups).sort().join(", ")}</p>
+            </div>
+            <label className="field">
+              <span>Tracking number</span>
+              <input autoFocus value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} />
+            </label>
+            <div className="page-top-actions">
+              <button className="action-button" type="button" onClick={() => void submitTrackingNumber()}>Save tracking</button>
+              <button className="action-button ghost" type="button" onClick={() => setTrackingOrder(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );

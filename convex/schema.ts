@@ -136,6 +136,8 @@ export default defineSchema({
     country: v.string(),
     email: v.string(),
     customerId: v.string(),
+    trackingNumber: v.optional(v.string()),
+    processedAt: v.optional(v.string()),
     sourceFile: v.optional(v.string()),
     updatedAt: v.string(),
   })

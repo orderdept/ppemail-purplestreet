@@ -80,3 +80,33 @@ export const upsertOrders = mutation({
     return { added, updated };
   },
 });
+
+export const markProcessed = mutation({
+  args: {
+    moduleKey: v.string(),
+    orderIds: v.array(v.string()),
+    trackingNumber: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const processedAt = new Date().toISOString();
+    let updated = 0;
+
+    for (const orderId of args.orderIds) {
+      const existing = await ctx.db
+        .query("pepCustomerOrders")
+        .withIndex("by_module_order", (q) => q.eq("moduleKey", args.moduleKey).eq("orderId", orderId))
+        .first();
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          trackingNumber: args.trackingNumber,
+          processedAt,
+          updatedAt: processedAt,
+        });
+        updated += 1;
+      }
+    }
+
+    return { updated, processedAt };
+  },
+});

@@ -819,6 +819,13 @@ h1 {
   margin-top: 16px;
 }
 
+.table-action-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .tab-row {
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -1037,6 +1044,29 @@ h1 {
   overflow: auto;
   padding: 16px;
   white-space: pre-wrap;
+}
+
+.modal-backdrop {
+  align-items: center;
+  background: rgba(36, 22, 41, 0.42);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 20;
+}
+
+.dialog-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 30px 80px rgba(36, 22, 41, 0.22);
+  display: grid;
+  gap: 18px;
+  max-width: 460px;
+  padding: 22px;
+  width: min(100%, 460px);
 }
 
 .activity-list {

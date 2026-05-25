@@ -52,6 +52,8 @@ function cleanOrder(value: unknown): PepCustomerOrder | null {
     country: cleanText(row.country),
     email: cleanText(row.email).toLowerCase(),
     customerId: cleanText(row.customerId),
+    trackingNumber: cleanText(row.trackingNumber),
+    processedAt: cleanText(row.processedAt),
   };
 }
 
