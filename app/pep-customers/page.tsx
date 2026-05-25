@@ -765,7 +765,7 @@ export default function PepCustomersPage() {
                     <td>{customer.orderGroups.size} orders<br /><small>{Array.from(customer.orderGroups).sort().join(", ")} · {customer.lineCount} lines</small></td>
                     <td>{moneyFormatter.format(customer.revenue)}</td>
                     <td>{moneyFormatter.format(customer.totalProfit)}</td>
-                    <td>{customer.lastOrder}</td>
+                    <td>{displayDate(customer.lastOrder)}</td>
                   </tr>
                 )) : <tr><td colSpan={7}>No customers imported yet.</td></tr>}
               </tbody>

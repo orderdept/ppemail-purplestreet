@@ -152,7 +152,13 @@ function formatDuration(ms: number) {
 
 function formatDraftCompletion(readyCount: number, spacing: number) {
   if (!readyCount) return "—";
-  return new Date(Date.now() + Math.max(0, readyCount - 1) * spacing).toLocaleString();
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(Date.now() + Math.max(0, readyCount - 1) * spacing));
 }
 
 export function CampaignWorkspace({

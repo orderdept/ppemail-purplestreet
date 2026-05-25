@@ -226,8 +226,11 @@ export async function getPurplePricesData() {
 export function formatDateTime(value?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    month: "2-digit",
+    day: "2-digit",
+    year: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(value));
 }
 
