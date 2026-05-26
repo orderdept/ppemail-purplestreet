@@ -933,6 +933,18 @@ h1 {
   color: var(--danger-text);
 }
 
+.status-chip-button {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.status-chip-button:hover {
+  filter: brightness(0.97);
+  text-decoration: underline;
+}
+
 .pill-list {
   display: flex;
   flex-wrap: wrap;

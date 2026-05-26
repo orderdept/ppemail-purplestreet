@@ -692,8 +692,37 @@ export default function PepCustomersPage() {
 
   function openTrackingDialog(order: ProcessOrderRow) {
     setTrackingOrder(order);
-    setTrackingNumber("");
+    setTrackingNumber(order.trackingNumber || "");
     setProcessStatus("");
+  }
+
+  function openEditTrackingDialog(order: OrderRow) {
+    const relatedOrders = orders.filter((item) => item.customerId === order.customerId && item.orderGroup === order.orderGroup);
+    const orderIds = relatedOrders.map((item) => item.orderId);
+    const editOrder = {
+      ...order,
+      groupKey: `${order.customerId}|${order.orderGroup}|edit-tracking`,
+      orderGroups: new Set<string>([order.orderGroup]),
+      orderIds: orderIds.length ? orderIds : [order.orderId],
+      items: relatedOrders.length
+        ? relatedOrders.map((item) => ({
+            orderId: item.orderId,
+            productName: item.productName,
+            dose: item.dose,
+            qty: item.qty,
+            sku: item.sku,
+          }))
+        : [{
+            orderId: order.orderId,
+            productName: order.productName,
+            dose: order.dose,
+            qty: order.qty,
+            sku: order.sku,
+          }],
+      dateText: displayDate(order.orderDate),
+    } satisfies ProcessOrderRow;
+
+    openTrackingDialog(editOrder);
   }
 
   async function submitTrackingNumber() {
@@ -717,7 +746,9 @@ export default function PepCustomersPage() {
       setOrders(Array.isArray(data.orders) ? data.orders : orders);
       setTrackingOrder(null);
       setTrackingNumber("");
-      setProcessStatus(`Marked ${trackingOrder.orderGroups.size} order${trackingOrder.orderGroups.size === 1 ? "" : "s"} as processed.`);
+      const message = `Saved tracking for ${Array.from(trackingOrder.orderGroups).sort().join(", ")}.`;
+      setProcessStatus(message);
+      setCopyStatus(message);
     } catch (error) {
       setProcessStatus(error instanceof Error ? error.message : "Could not process that order.");
     } finally {
@@ -906,7 +937,20 @@ export default function PepCustomersPage() {
                       </button>
                     </td>
                     <td>{order.customerId}</td>
-                    <td><span className={`status-chip ${order.processedAt ? "ready" : "duplicate"}`}>{order.processedAt ? "Sent" : "Pending"}</span></td>
+                    <td>
+                      {order.processedAt ? (
+                        <button
+                          className="status-chip status-chip-button ready"
+                          onClick={() => openEditTrackingDialog(order)}
+                          title={order.trackingNumber ? `Tracking: ${order.trackingNumber}` : "Click to edit tracking"}
+                          type="button"
+                        >
+                          Sent
+                        </button>
+                      ) : (
+                        <span className="status-chip duplicate">Pending</span>
+                      )}
+                    </td>
                   </tr>
                 )) : <tr><td colSpan={11}>No matching orders.</td></tr>}
               </tbody>
@@ -1031,7 +1075,7 @@ export default function PepCustomersPage() {
           <div aria-modal="true" className="dialog-panel" role="dialog">
             <div>
               <p className="section-step">Tracking</p>
-              <h2>Mark Order Processed</h2>
+              <h2>{trackingOrder.processedAt ? "Edit Tracking" : "Mark Order Processed"}</h2>
               <p className="quiet-note">{trackingOrder.customerName} · {Array.from(trackingOrder.orderGroups).sort().join(", ")}</p>
             </div>
             <label className="field">
