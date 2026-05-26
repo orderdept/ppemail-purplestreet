@@ -273,7 +273,7 @@ function addressLabel(order: OrderRow | CustomerRow | ProcessOrderRow) {
     itemTotals.set(label, (itemTotals.get(label) || 0) + (item.qty || 0));
   });
   const itemLines = Array.from(itemTotals.entries()).map(([label, qty]) => `Qty ${qty} - ${label}`);
-  return [order.customerName, order.company, order.address, order.address2, cityStateZip, ...itemLines]
+  return [order.customerName, order.company, order.address, order.address2, cityStateZip, order.email, ...itemLines]
     .map(cleanText)
     .filter(Boolean)
     .join("\n");
