@@ -522,6 +522,7 @@ export default function PepCustomersPage() {
   const [copyStatus, setCopyStatus] = useState("");
   const [trackingOrder, setTrackingOrder] = useState<ProcessOrderRow | null>(null);
   const [trackingNumber, setTrackingNumber] = useState("");
+  const [isSavingTracking, setIsSavingTracking] = useState(false);
   const [processStatus, setProcessStatus] = useState("");
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
@@ -704,13 +705,14 @@ export default function PepCustomersPage() {
     }
 
     setProcessStatus("Saving tracking number...");
+    setIsSavingTracking(true);
     try {
       const response = await fetch("/api/pep-customers/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderIds: trackingOrder.orderIds, trackingNumber: tracking }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.error || "Could not process that order.");
       setOrders(Array.isArray(data.orders) ? data.orders : orders);
       setTrackingOrder(null);
@@ -718,6 +720,8 @@ export default function PepCustomersPage() {
       setProcessStatus(`Marked ${trackingOrder.orderGroups.size} order${trackingOrder.orderGroups.size === 1 ? "" : "s"} as processed.`);
     } catch (error) {
       setProcessStatus(error instanceof Error ? error.message : "Could not process that order.");
+    } finally {
+      setIsSavingTracking(false);
     }
   }
 
@@ -1032,11 +1036,24 @@ export default function PepCustomersPage() {
             </div>
             <label className="field">
               <span>Tracking number</span>
-              <input autoFocus value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} />
+              <input
+                autoFocus
+                onChange={(event) => setTrackingNumber(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitTrackingNumber();
+                  }
+                }}
+                value={trackingNumber}
+              />
             </label>
+            {processStatus ? <small className="inline-status">{processStatus}</small> : null}
             <div className="page-top-actions">
-              <button className="action-button" type="button" onClick={() => void submitTrackingNumber()}>Save tracking</button>
-              <button className="action-button ghost" type="button" onClick={() => setTrackingOrder(null)}>Cancel</button>
+              <button className="action-button" disabled={isSavingTracking} type="button" onClick={() => void submitTrackingNumber()}>
+                {isSavingTracking ? "Saving..." : "Save tracking"}
+              </button>
+              <button className="action-button ghost" disabled={isSavingTracking} type="button" onClick={() => setTrackingOrder(null)}>Cancel</button>
             </div>
           </div>
         </div>

@@ -27,13 +27,19 @@ export async function POST(request: Request) {
     }
 
     const result = await markConvexPepCustomerOrdersProcessed(orderIds, trackingNumber);
+    const updated = result?.updated ?? 0;
+
+    if (!updated) {
+      return NextResponse.json({ error: "No matching order was found to mark as processed." }, { status: 404 });
+    }
+
     const orders = await getConvexPepCustomerOrders();
 
     revalidatePath("/pep-customers");
 
     return NextResponse.json({
       ok: true,
-      updated: result?.updated ?? 0,
+      updated,
       orders: orders ?? [],
     });
   } catch (error) {
