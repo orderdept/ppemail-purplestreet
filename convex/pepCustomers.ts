@@ -27,6 +27,12 @@ const orderShape = {
   customerId: v.string(),
 };
 
+const skuPriceShape = {
+  sku: v.string(),
+  cost: v.number(),
+  price: v.number(),
+};
+
 export const listOrders = query({
   args: {
     moduleKey: v.string(),
@@ -41,6 +47,66 @@ export const listOrders = query({
       const dateCompare = a.orderDate.localeCompare(b.orderDate);
       return dateCompare || a.orderId.localeCompare(b.orderId, undefined, { numeric: true });
     });
+  },
+});
+
+export const listSkuPrices = query({
+  args: {
+    moduleKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("pepSkuPrices")
+      .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
+      .collect();
+
+    return rows.sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true }));
+  },
+});
+
+export const upsertSkuPrice = mutation({
+  args: {
+    moduleKey: v.string(),
+    item: v.object(skuPriceShape),
+  },
+  handler: async (ctx, args) => {
+    const updatedAt = new Date().toISOString();
+    const existing = await ctx.db
+      .query("pepSkuPrices")
+      .withIndex("by_module_sku", (q) => q.eq("moduleKey", args.moduleKey).eq("sku", args.item.sku))
+      .first();
+
+    const row = {
+      moduleKey: args.moduleKey,
+      ...args.item,
+      updatedAt,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, row);
+      return { updated: 1, added: 0 };
+    }
+
+    await ctx.db.insert("pepSkuPrices", row);
+    return { updated: 0, added: 1 };
+  },
+});
+
+export const deleteSkuPrice = mutation({
+  args: {
+    moduleKey: v.string(),
+    sku: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("pepSkuPrices")
+      .withIndex("by_module_sku", (q) => q.eq("moduleKey", args.moduleKey).eq("sku", args.sku))
+      .first();
+
+    if (!existing) return { deleted: 0 };
+
+    await ctx.db.delete(existing._id);
+    return { deleted: 1 };
   },
 });
 

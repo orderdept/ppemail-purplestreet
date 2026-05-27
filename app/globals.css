@@ -677,6 +677,10 @@ h1 {
   color: var(--accent);
 }
 
+.action-button.danger-action {
+  color: var(--danger-text);
+}
+
 .button-like {
   cursor: pointer;
 }
@@ -757,6 +761,24 @@ h1 {
 
 .host-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pricing-manager {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.compact-section-head {
+  margin-bottom: 14px;
+}
+
+.sku-price-form {
+  align-items: end;
+  grid-template-columns: minmax(180px, 1.3fr) repeat(2, minmax(120px, 0.75fr)) auto;
+}
+
+.sku-price-actions {
+  align-items: end;
 }
 
 .field {

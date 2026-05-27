@@ -58,6 +58,20 @@ type ProcessOrderRow = OrderRow & {
   dateText: string;
 };
 
+type SkuPriceRow = {
+  id: string;
+  sku: string;
+  cost: number;
+  price: number;
+  updatedAt: string;
+};
+
+type ImportResult = {
+  orders: OrderRow[];
+  autoPriced: number;
+  missingPriceSkus: string[];
+};
+
 type ShippingField = "company" | "address" | "address2" | "city" | "state" | "zipcode";
 
 const shippingFields: ShippingField[] = ["company", "address", "address2", "city", "state", "zipcode"];
@@ -68,8 +82,6 @@ const requiredColumns = {
   sku: ["sku"],
   brand: ["brand"],
   qty: ["qty", "quantity"],
-  cost: ["cost", "supplier_payout"],
-  price: ["price"],
   customerName: ["customer_name", "customer"],
   company: ["company", "shipping_company"],
   address: ["address", "address1", "address_1", "shipping_address1", "shipping_address_1"],
@@ -83,6 +95,8 @@ const requiredColumns = {
 } as const;
 
 const optionalColumns = {
+  cost: ["cost", "supplier_payout"],
+  price: ["price"],
   productName: ["product_name", "product", "item_name", "item"],
   ingredient: ["ingredient"],
   dose: ["dose"],
@@ -115,6 +129,10 @@ function cleanText(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function skuKey(value: unknown) {
+  return cleanText(value).toUpperCase();
+}
+
 function normalizeHeader(value: unknown) {
   return cleanText(value)
     .toLowerCase()
@@ -127,6 +145,12 @@ function parseMoney(value: unknown) {
   const parsed = Number(raw.replace(/[$,\s]/g, "").replace(/[()]/g, ""));
   if (!Number.isFinite(parsed)) return 0;
   return raw.includes("(") && raw.includes(")") ? -parsed : parsed;
+}
+
+function hasMoneyValue(value: unknown) {
+  const raw = cleanText(value);
+  if (!raw) return false;
+  return Number.isFinite(Number(raw.replace(/[$,\s]/g, "").replace(/[()]/g, "")));
 }
 
 function formatDate(value: unknown) {
@@ -376,26 +400,27 @@ function optionalCell(row: unknown[], columns: Record<OptionalColumnKey, number>
   return index >= 0 ? row[index] : "";
 }
 
-function importOrders(rows: unknown[][]) {
+function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult {
   const headerIndex = rows.findIndex((row) => row.some((value) => normalizeHeader(value) === "order_id"));
   if (headerIndex < 0) throw new Error("Could not find an Order ID header row in the first sheet.");
 
   const columns = findColumns(rows[headerIndex]);
   const optional = findOptionalColumns(rows[headerIndex]);
+  const priceMap = new Map(skuPrices.map((item) => [skuKey(item.sku), item]));
+  let autoPriced = 0;
+  const missingPriceSkus = new Set<string>();
   const missing = Object.entries(columns)
     .filter(([, index]) => index < 0)
     .map(([field]) => field);
   if (missing.length) throw new Error(`Missing required columns: ${missing.join(", ")}.`);
 
-  return rows
+  const orders = rows
     .slice(headerIndex + 1)
     .map((row, index): OrderRow | null => {
       const orderId = cleanText(cell(row, columns, "orderId"));
       const customerName = cleanText(cell(row, columns, "customerName"));
       const customerId = cleanText(cell(row, columns, "customerId"));
       if (!orderId || !customerName || !customerId) return null;
-      const cost = parseMoney(cell(row, columns, "cost"));
-      const price = parseMoney(cell(row, columns, "price"));
       const rawProductName =
         cleanText(optionalCell(row, optional, "productName")) ||
         cleanText(optionalCell(row, optional, "ingredient")) ||
@@ -404,12 +429,27 @@ function importOrders(rows: unknown[][]) {
       const columnQty = Number(cell(row, columns, "qty")) || 0;
       const bundleQty = qtyFromProductName(rawProductName);
       const quantity = bundleQty > 1 && columnQty <= 1 ? bundleQty : columnQty || bundleQty || 0;
+      const sku = cleanText(cell(row, columns, "sku"));
+      const savedPrice = priceMap.get(skuKey(sku));
+      const spreadsheetCost = optional.cost >= 0 && hasMoneyValue(optionalCell(row, optional, "cost"))
+        ? parseMoney(optionalCell(row, optional, "cost"))
+        : 0;
+      const spreadsheetPrice = optional.price >= 0 && hasMoneyValue(optionalCell(row, optional, "price"))
+        ? parseMoney(optionalCell(row, optional, "price"))
+        : 0;
+      const cost = savedPrice ? savedPrice.cost * quantity : spreadsheetCost;
+      const price = savedPrice ? savedPrice.price * quantity : spreadsheetPrice;
+      if (savedPrice) {
+        autoPriced += 1;
+      } else if (!spreadsheetCost && !spreadsheetPrice && sku) {
+        missingPriceSkus.add(sku);
+      }
       return {
         id: `${orderId}-${index}`,
         orderId,
         orderGroup: orderGroup(orderId),
         orderDate: formatDate(cell(row, columns, "orderDate")),
-        sku: cleanText(cell(row, columns, "sku")),
+        sku,
         productName,
         dose: cleanText(optionalCell(row, optional, "dose")) || doseFromProductName(rawProductName),
         brand: glpBrand(cell(row, columns, "brand")) || productName,
@@ -434,6 +474,12 @@ function importOrders(rows: unknown[][]) {
       };
     })
     .filter((order): order is OrderRow => Boolean(order));
+
+  return {
+    orders,
+    autoPriced,
+    missingPriceSkus: Array.from(missingPriceSkus).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+  };
 }
 
 function customerGroups(orders: OrderRow[]) {
@@ -509,6 +555,7 @@ async function writeClipboardText(text: string) {
 
 export default function PepCustomersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [skuPrices, setSkuPrices] = useState<SkuPriceRow[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("customers");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("Loading saved orders...");
@@ -524,6 +571,9 @@ export default function PepCustomersPage() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isSavingTracking, setIsSavingTracking] = useState(false);
   const [processStatus, setProcessStatus] = useState("");
+  const [skuForm, setSkuForm] = useState({ sku: "", cost: "", price: "" });
+  const [skuStatus, setSkuStatus] = useState("");
+  const [isSavingSku, setIsSavingSku] = useState(false);
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
   const filteredOrders = useMemo(
@@ -615,16 +665,23 @@ export default function PepCustomersPage() {
   useEffect(() => {
     let ignore = false;
 
-    async function loadOrders() {
+    async function loadSavedData() {
       try {
-        const response = await fetch("/api/pep-customers/orders", { cache: "no-store" });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.error || "Could not load saved orders.");
+        const [ordersResponse, pricesResponse] = await Promise.all([
+          fetch("/api/pep-customers/orders", { cache: "no-store" }),
+          fetch("/api/pep-customers/sku-prices", { cache: "no-store" }),
+        ]);
+        const ordersData = await ordersResponse.json();
+        const pricesData = await pricesResponse.json();
+        if (!ordersResponse.ok) throw new Error(ordersData?.error || "Could not load saved orders.");
+        if (!pricesResponse.ok) throw new Error(pricesData?.error || "Could not load saved SKU pricing.");
 
-        const saved = Array.isArray(data.orders) ? (data.orders as OrderRow[]) : [];
+        const saved = Array.isArray(ordersData.orders) ? (ordersData.orders as OrderRow[]) : [];
+        const savedPrices = Array.isArray(pricesData.prices) ? (pricesData.prices as SkuPriceRow[]) : [];
 
         if (!ignore) {
           setOrders(saved);
+          setSkuPrices(savedPrices);
           if (saved.length) {
             setStatus(`Loaded ${saved.length} saved order lines from the server database.`);
           } else if (!saved.length) {
@@ -638,7 +695,7 @@ export default function PepCustomersPage() {
       }
     }
 
-    void loadOrders();
+    void loadSavedData();
 
     return () => {
       ignore = true;
@@ -651,23 +708,90 @@ export default function PepCustomersPage() {
       const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: true });
-      const imported = importOrders(rows);
-      setStatus(`Saving ${imported.length} order lines from ${file.name}...`);
+      const imported = importOrders(rows, skuPrices);
+      setStatus(`Saving ${imported.orders.length} order lines from ${file.name}...`);
       const response = await fetch("/api/pep-customers/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orders: imported, sourceFile: file.name }),
+        body: JSON.stringify({ orders: imported.orders, sourceFile: file.name }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || "Could not save that order file.");
 
-      setOrders(Array.isArray(data.orders) ? data.orders : imported);
+      setOrders(Array.isArray(data.orders) ? data.orders : imported.orders);
       setSelected(new Set());
       setActiveTab("orders");
-      setStatus(`Saved ${file.name}: ${data.added ?? 0} new order lines and ${data.updated ?? 0} updated lines.`);
+      const pricingNote = imported.autoPriced
+        ? ` ${imported.autoPriced} line${imported.autoPriced === 1 ? "" : "s"} priced by saved SKU.`
+        : "";
+      const missingNote = imported.missingPriceSkus.length
+        ? ` Missing SKU pricing: ${imported.missingPriceSkus.slice(0, 6).join(", ")}${imported.missingPriceSkus.length > 6 ? "..." : ""}.`
+        : "";
+      setStatus(`Saved ${file.name}: ${data.added ?? 0} new order lines and ${data.updated ?? 0} updated lines.${pricingNote}${missingNote}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not import that order file.");
     }
+  }
+
+  async function saveSkuPrice() {
+    const sku = skuKey(skuForm.sku);
+    if (!sku) {
+      setSkuStatus("Enter a SKU first.");
+      return;
+    }
+
+    setSkuStatus("Saving SKU pricing...");
+    setIsSavingSku(true);
+    try {
+      const response = await fetch("/api/pep-customers/sku-prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku,
+          cost: parseMoney(skuForm.cost),
+          price: parseMoney(skuForm.price),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Could not save that SKU pricing.");
+      setSkuPrices(Array.isArray(data.prices) ? data.prices : skuPrices);
+      setSkuForm({ sku: "", cost: "", price: "" });
+      setSkuStatus(`Saved pricing for ${sku}.`);
+    } catch (error) {
+      setSkuStatus(error instanceof Error ? error.message : "Could not save that SKU pricing.");
+    } finally {
+      setIsSavingSku(false);
+    }
+  }
+
+  async function deleteSkuPrice(sku: string) {
+    const cleanedSku = skuKey(sku);
+    if (!cleanedSku) return;
+
+    setSkuStatus(`Removing pricing for ${cleanedSku}...`);
+    setIsSavingSku(true);
+    try {
+      const response = await fetch(`/api/pep-customers/sku-prices?sku=${encodeURIComponent(cleanedSku)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Could not remove that SKU pricing.");
+      setSkuPrices(Array.isArray(data.prices) ? data.prices : skuPrices.filter((item) => skuKey(item.sku) !== cleanedSku));
+      setSkuStatus(`Removed pricing for ${cleanedSku}.`);
+    } catch (error) {
+      setSkuStatus(error instanceof Error ? error.message : "Could not remove that SKU pricing.");
+    } finally {
+      setIsSavingSku(false);
+    }
+  }
+
+  function editSkuPrice(item: SkuPriceRow) {
+    setSkuForm({
+      sku: item.sku,
+      cost: String(item.cost),
+      price: String(item.price),
+    });
+    setSkuStatus(`Editing ${item.sku}.`);
   }
 
   function toggleSelected(id: string, checked: boolean) {
@@ -1034,9 +1158,82 @@ export default function PepCustomersPage() {
             <div>
               <p className="section-step">Import</p>
               <h2>Order Spreadsheet</h2>
-              <p>Reads the first sheet, saves the requested order fields to the server database, and adds each new upload to the existing order history.</p>
+              <p>Reads the first sheet, fills saved SKU pricing when available, and adds each upload to the existing order history.</p>
             </div>
             <input className="plain-file-input" type="file" accept=".xlsx,.xls" onChange={(event) => event.target.files?.[0] && void handleFile(event.target.files[0])} />
+          </div>
+          <div className="pricing-manager top-gap">
+            <div className="section-head compact-section-head">
+              <div>
+                <p className="section-step">SKU Pricing</p>
+                <h2>Saved Cost And Price</h2>
+                <p>Saved values are unit amounts. During import, matching SKUs use unit cost and unit price multiplied by Quantity.</p>
+              </div>
+            </div>
+            <div className="host-form-grid sku-price-form">
+              <label className="field">
+                <span>SKU</span>
+                <input
+                  onChange={(event) => setSkuForm((current) => ({ ...current, sku: event.target.value }))}
+                  placeholder="SKU"
+                  value={skuForm.sku}
+                />
+              </label>
+              <label className="field">
+                <span>Supplier payout</span>
+                <input
+                  inputMode="decimal"
+                  onChange={(event) => setSkuForm((current) => ({ ...current, cost: event.target.value }))}
+                  placeholder="0.00"
+                  value={skuForm.cost}
+                />
+              </label>
+              <label className="field">
+                <span>Price</span>
+                <input
+                  inputMode="decimal"
+                  onChange={(event) => setSkuForm((current) => ({ ...current, price: event.target.value }))}
+                  placeholder="0.00"
+                  value={skuForm.price}
+                />
+              </label>
+              <div className="page-top-actions sku-price-actions">
+                <button className="action-button" disabled={isSavingSku} type="button" onClick={() => void saveSkuPrice()}>
+                  {isSavingSku ? "Saving..." : "Save SKU"}
+                </button>
+                <button className="action-button ghost" disabled={isSavingSku} type="button" onClick={() => setSkuForm({ sku: "", cost: "", price: "" })}>
+                  Clear
+                </button>
+              </div>
+            </div>
+            {skuStatus ? <small className="inline-status">{skuStatus}</small> : null}
+            <div className="table-wrap top-gap">
+              <table className="data-table ops-table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Supplier Payout</th>
+                    <th>Price</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {skuPrices.length ? skuPrices.map((item) => (
+                    <tr key={item.sku}>
+                      <td><strong>{item.sku}</strong></td>
+                      <td>{moneyFormatter.format(item.cost)}</td>
+                      <td>{moneyFormatter.format(item.price)}</td>
+                      <td>
+                        <div className="table-action-row">
+                          <button className="action-button ghost" type="button" onClick={() => editSkuPrice(item)}>Edit</button>
+                          <button className="action-button ghost danger-action" disabled={isSavingSku} type="button" onClick={() => void deleteSkuPrice(item.sku)}>Remove</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : <tr><td colSpan={4}>No SKU pricing saved yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       ) : null}

@@ -143,4 +143,14 @@ export default defineSchema({
   })
     .index("by_module", ["moduleKey"])
     .index("by_module_order", ["moduleKey", "orderId"]),
+
+  pepSkuPrices: defineTable({
+    moduleKey: v.string(),
+    sku: v.string(),
+    cost: v.number(),
+    price: v.number(),
+    updatedAt: v.string(),
+  })
+    .index("by_module", ["moduleKey"])
+    .index("by_module_sku", ["moduleKey", "sku"]),
 });

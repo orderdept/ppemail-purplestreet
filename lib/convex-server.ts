@@ -229,7 +229,19 @@ export type PepCustomerOrder = {
   processedAt: string;
 };
 
+export type PepSkuPrice = {
+  id: string;
+  sku: string;
+  cost: number;
+  price: number;
+  updatedAt: string;
+};
+
 type ConvexPepCustomerOrder = Omit<PepCustomerOrder, "id"> & {
+  _id: unknown;
+};
+
+type ConvexPepSkuPrice = Omit<PepSkuPrice, "id"> & {
   _id: unknown;
 };
 
@@ -264,6 +276,16 @@ function toPepCustomerOrder(row: ConvexPepCustomerOrder): PepCustomerOrder {
   };
 }
 
+function toPepSkuPrice(row: ConvexPepSkuPrice): PepSkuPrice {
+  return {
+    id: String(row._id),
+    sku: row.sku,
+    cost: row.cost,
+    price: row.price,
+    updatedAt: row.updatedAt,
+  };
+}
+
 export async function getConvexPepCustomerOrders() {
   const client = getConvexClient();
   if (!client) {
@@ -273,6 +295,17 @@ export async function getConvexPepCustomerOrders() {
     moduleKey: pepCustomersModuleKey,
   })) as ConvexPepCustomerOrder[];
   return rows.map(toPepCustomerOrder);
+}
+
+export async function getConvexPepSkuPrices() {
+  const client = getConvexClient();
+  if (!client) {
+    return null;
+  }
+  const rows = (await client.query(api.pepCustomers.listSkuPrices, {
+    moduleKey: pepCustomersModuleKey,
+  })) as ConvexPepSkuPrice[];
+  return rows.map(toPepSkuPrice);
 }
 
 export async function upsertConvexPepCustomerOrders(orders: PepCustomerOrder[], sourceFile?: string) {
@@ -285,6 +318,28 @@ export async function upsertConvexPepCustomerOrders(orders: PepCustomerOrder[], 
     moduleKey: pepCustomersModuleKey,
     sourceFile,
     orders: payload,
+  });
+}
+
+export async function upsertConvexPepSkuPrice(item: Pick<PepSkuPrice, "sku" | "cost" | "price">) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.pepCustomers.upsertSkuPrice, {
+    moduleKey: pepCustomersModuleKey,
+    item,
+  });
+}
+
+export async function deleteConvexPepSkuPrice(sku: string) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.pepCustomers.deleteSkuPrice, {
+    moduleKey: pepCustomersModuleKey,
+    sku,
   });
 }
 
