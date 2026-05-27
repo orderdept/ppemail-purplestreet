@@ -95,8 +95,6 @@ const requiredColumns = {
 } as const;
 
 const optionalColumns = {
-  cost: ["cost", "supplier_payout"],
-  price: ["price"],
   productName: ["product_name", "product", "item_name", "item"],
   ingredient: ["ingredient"],
   dose: ["dose"],
@@ -145,12 +143,6 @@ function parseMoney(value: unknown) {
   const parsed = Number(raw.replace(/[$,\s]/g, "").replace(/[()]/g, ""));
   if (!Number.isFinite(parsed)) return 0;
   return raw.includes("(") && raw.includes(")") ? -parsed : parsed;
-}
-
-function hasMoneyValue(value: unknown) {
-  const raw = cleanText(value);
-  if (!raw) return false;
-  return Number.isFinite(Number(raw.replace(/[$,\s]/g, "").replace(/[()]/g, "")));
 }
 
 function formatDate(value: unknown) {
@@ -431,17 +423,11 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
       const quantity = bundleQty > 1 && columnQty <= 1 ? bundleQty : columnQty || bundleQty || 0;
       const sku = cleanText(cell(row, columns, "sku"));
       const savedPrice = priceMap.get(skuKey(sku));
-      const spreadsheetCost = optional.cost >= 0 && hasMoneyValue(optionalCell(row, optional, "cost"))
-        ? parseMoney(optionalCell(row, optional, "cost"))
-        : 0;
-      const spreadsheetPrice = optional.price >= 0 && hasMoneyValue(optionalCell(row, optional, "price"))
-        ? parseMoney(optionalCell(row, optional, "price"))
-        : 0;
-      const cost = savedPrice ? savedPrice.cost * quantity : spreadsheetCost;
-      const price = savedPrice ? savedPrice.price * quantity : spreadsheetPrice;
+      const cost = savedPrice ? savedPrice.cost * quantity : 0;
+      const price = savedPrice ? savedPrice.price * quantity : 0;
       if (savedPrice) {
         autoPriced += 1;
-      } else if (!spreadsheetCost && !spreadsheetPrice && sku) {
+      } else if (sku) {
         missingPriceSkus.add(sku);
       }
       return {
@@ -1168,7 +1154,7 @@ export default function PepCustomersPage() {
             <div>
               <p className="section-step">Import</p>
               <h2>Order Spreadsheet</h2>
-              <p>Reads the first sheet, fills saved SKU pricing when available, and adds each upload to the existing order history.</p>
+              <p>Reads the first sheet, ignores spreadsheet cost and price columns, and prices each line from saved SKU pricing.</p>
             </div>
             <input className="plain-file-input" type="file" accept=".xlsx,.xls" onChange={(event) => event.target.files?.[0] && void handleFile(event.target.files[0])} />
           </div>
@@ -1177,7 +1163,7 @@ export default function PepCustomersPage() {
               <div>
                 <p className="section-step">SKU Pricing</p>
                 <h2>Saved Cost And Price</h2>
-                <p>Saved values are unit amounts. During import, matching SKUs use unit cost and unit price multiplied by Quantity.</p>
+                <p>Saved values are unit amounts. During import, spreadsheet Supplier Payout and Price are ignored.</p>
               </div>
             </div>
             <div className="host-form-grid sku-price-form">
