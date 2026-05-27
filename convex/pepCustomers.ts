@@ -33,6 +33,10 @@ const skuPriceShape = {
   price: v.number(),
 };
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 export const listOrders = query({
   args: {
     moduleKey: v.string(),
@@ -137,6 +141,9 @@ export const upsertOrders = mutation({
       if (existing) {
         await ctx.db.patch(existing._id, {
           ...row,
+          cost: existing.cost,
+          price: existing.price,
+          profit: existing.profit,
           company: row.company || existing.company || "",
           address: row.address || existing.address || "",
           address2: row.address2 || existing.address2 || "",
@@ -153,6 +160,32 @@ export const upsertOrders = mutation({
     }
 
     return { added, updated };
+  },
+});
+
+export const updateOrderPricing = mutation({
+  args: {
+    moduleKey: v.string(),
+    orderId: v.string(),
+    cost: v.number(),
+    price: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("pepCustomerOrders")
+      .withIndex("by_module_order", (q) => q.eq("moduleKey", args.moduleKey).eq("orderId", args.orderId))
+      .first();
+
+    if (!existing) return { updated: 0 };
+
+    await ctx.db.patch(existing._id, {
+      cost: args.cost,
+      price: args.price,
+      profit: roundMoney(args.price - args.cost),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return { updated: 1 };
   },
 });
 

@@ -707,6 +707,41 @@ h1 {
   color: var(--accent);
 }
 
+.money-edit-button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 32px;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.money-edit-button:hover,
+.money-edit-button:focus-visible {
+  background: var(--accent-soft);
+  border-color: var(--line);
+  color: var(--accent);
+  outline: none;
+}
+
+.money-edit-input {
+  appearance: none;
+  background: var(--panel-soft);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  min-height: 32px;
+  padding: 4px 8px;
+  width: 92px;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

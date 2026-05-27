@@ -343,6 +343,19 @@ export async function deleteConvexPepSkuPrice(sku: string) {
   });
 }
 
+export async function updateConvexPepCustomerOrderPricing(orderId: string, cost: number, price: number) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.pepCustomers.updateOrderPricing, {
+    moduleKey: pepCustomersModuleKey,
+    orderId,
+    cost,
+    price,
+  });
+}
+
 export async function markConvexPepCustomerOrdersProcessed(orderIds: string[], trackingNumber: string) {
   const client = getConvexClient();
   if (!client) {

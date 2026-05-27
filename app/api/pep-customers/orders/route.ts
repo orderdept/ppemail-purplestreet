@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import {
   type PepCustomerOrder,
   getConvexPepCustomerOrders,
+  updateConvexPepCustomerOrderPricing,
   upsertConvexPepCustomerOrders,
 } from "../../../../lib/convex-server";
 
@@ -12,7 +13,7 @@ function cleanText(value: unknown) {
 }
 
 function cleanMoney(value: unknown) {
-  const numeric = Number(value);
+  const numeric = Number(String(value ?? "").replace(/[$,\s]/g, ""));
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
@@ -94,6 +95,41 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not save Pep Customers orders." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const orderId = cleanText(body?.orderId);
+    const cost = cleanMoney(body?.cost);
+    const price = cleanMoney(body?.price);
+
+    if (!orderId) {
+      return NextResponse.json({ error: "Choose an order line first." }, { status: 400 });
+    }
+
+    const result = await updateConvexPepCustomerOrderPricing(orderId, cost, price);
+    const updated = result?.updated ?? 0;
+
+    if (!updated) {
+      return NextResponse.json({ error: "No matching order line was found." }, { status: 404 });
+    }
+
+    const orders = await getConvexPepCustomerOrders();
+
+    revalidatePath("/pep-customers");
+
+    return NextResponse.json({
+      ok: true,
+      updated,
+      orders: orders ?? [],
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not save that order pricing." },
       { status: 500 },
     );
   }

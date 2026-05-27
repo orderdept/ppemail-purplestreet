@@ -560,6 +560,8 @@ export default function PepCustomersPage() {
   const [skuForm, setSkuForm] = useState({ sku: "", cost: "", price: "" });
   const [skuStatus, setSkuStatus] = useState("");
   const [isSavingSku, setIsSavingSku] = useState(false);
+  const [editingPricing, setEditingPricing] = useState<{ orderId: string; field: "cost" | "price"; value: string } | null>(null);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
   const filteredOrders = useMemo(
@@ -778,6 +780,90 @@ export default function PepCustomersPage() {
       price: String(item.price),
     });
     setSkuStatus(`Editing ${item.sku}.`);
+  }
+
+  function startPricingEdit(order: OrderRow, field: "cost" | "price") {
+    setEditingPricing({
+      orderId: order.orderId,
+      field,
+      value: String(order[field]),
+    });
+    setCopyStatus("");
+  }
+
+  function cancelPricingEdit() {
+    setEditingPricing(null);
+  }
+
+  async function saveOrderPricing(order: OrderRow) {
+    if (!editingPricing || editingPricing.orderId !== order.orderId || isSavingPricing) return;
+
+    const nextValue = parseMoney(editingPricing.value);
+    const cost = editingPricing.field === "cost" ? nextValue : order.cost;
+    const price = editingPricing.field === "price" ? nextValue : order.price;
+
+    setIsSavingPricing(true);
+    setCopyStatus(`Saving pricing for ${order.orderId}...`);
+    try {
+      const response = await fetch("/api/pep-customers/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.orderId, cost, price }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Could not save that order pricing.");
+      setOrders(Array.isArray(data.orders) ? data.orders : orders);
+      setEditingPricing(null);
+      setCopyStatus(`Saved pricing for ${order.orderId}.`);
+    } catch (error) {
+      setCopyStatus(error instanceof Error ? error.message : "Could not save that order pricing.");
+    } finally {
+      setIsSavingPricing(false);
+    }
+  }
+
+  function editableMoneyCell(order: OrderRow, field: "cost" | "price") {
+    const active = editingPricing?.orderId === order.orderId && editingPricing.field === field;
+
+    if (active) {
+      return (
+        <input
+          aria-label={`${field === "cost" ? "Cost" : "Price"} for ${order.orderId}`}
+          autoFocus
+          className="money-edit-input"
+          disabled={isSavingPricing}
+          inputMode="decimal"
+          onBlur={(event) => {
+            if (event.currentTarget.dataset.cancel === "true") return;
+            void saveOrderPricing(order);
+          }}
+          onChange={(event) => setEditingPricing((current) => current ? { ...current, value: event.target.value } : current)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void saveOrderPricing(order);
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.currentTarget.dataset.cancel = "true";
+              cancelPricingEdit();
+            }
+          }}
+          value={editingPricing.value}
+        />
+      );
+    }
+
+    return (
+      <button
+        className="money-edit-button"
+        onClick={() => startPricingEdit(order, field)}
+        title={`Click to edit ${field === "cost" ? "cost" : "price"}`}
+        type="button"
+      >
+        {moneyFormatter.format(order[field])}
+      </button>
+    );
   }
 
   function toggleSelected(id: string, checked: boolean) {
@@ -1058,8 +1144,8 @@ export default function PepCustomersPage() {
                     <td>{displayDate(order.orderDate)}</td>
                     <td><span className="status-chip ready">{order.brand}</span></td>
                     <td>{order.qty}</td>
-                    <td>{moneyFormatter.format(order.cost)}</td>
-                    <td>{moneyFormatter.format(order.price)}</td>
+                    <td>{editableMoneyCell(order, "cost")}</td>
+                    <td>{editableMoneyCell(order, "price")}</td>
                     <td>{moneyFormatter.format(order.profit)}</td>
                     <td>
                       <button className="inline-copy-button" onClick={() => void copyOrderEmail(order)} title={order.email} type="button">
@@ -1163,7 +1249,7 @@ export default function PepCustomersPage() {
               <div>
                 <p className="section-step">SKU Pricing</p>
                 <h2>Saved Cost And Price</h2>
-                <p>Saved values are unit amounts. During import, spreadsheet Supplier Payout and Price are ignored.</p>
+                <p>Saved values are unit amounts for new imports. Existing order lines keep their saved cost and price unless edited on Orders.</p>
               </div>
             </div>
             <div className="host-form-grid sku-price-form">
