@@ -1245,7 +1245,6 @@ export default function PepCustomersPage() {
                   <th>Customer Name</th>
                   <th>Customer ID</th>
                   <th>{processSortableHeader("orderGroup", "Order #")}</th>
-                  <th>Shipping Address</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1259,7 +1258,6 @@ export default function PepCustomersPage() {
                       <td><strong>{order.customerName}</strong></td>
                       <td>{order.customerId}</td>
                       <td title={allOrderIds.join(", ")}>{mainOrders.join(", ")}</td>
-                      <td>{addressText(order)}</td>
                       <td>
                         <div className="table-action-row">
                           <span className="copy-preview-wrap">
@@ -1278,7 +1276,7 @@ export default function PepCustomersPage() {
                       </td>
                     </tr>
                   );
-                }) : <tr><td colSpan={6}>No pending orders to process.</td></tr>}
+                }) : <tr><td colSpan={5}>No pending orders to process.</td></tr>}
               </tbody>
             </table>
           </div>
