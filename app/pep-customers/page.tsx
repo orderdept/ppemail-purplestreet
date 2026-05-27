@@ -232,6 +232,49 @@ function shippingAddressKey(order: Pick<OrderRow, "address" | "address2" | "city
   return normalized || "missing-shipping-address";
 }
 
+function normalizedShippingPart(value: unknown) {
+  return cleanText(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function editDistanceWithin(left: string, right: string, limit: number) {
+  if (Math.abs(left.length - right.length) > limit) return false;
+
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    let rowMinimum = current[0];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const cost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      const next = Math.min(
+        previous[rightIndex] + 1,
+        current[rightIndex - 1] + 1,
+        previous[rightIndex - 1] + cost,
+      );
+      current[rightIndex] = next;
+      rowMinimum = Math.min(rowMinimum, next);
+    }
+    if (rowMinimum > limit) return false;
+    previous = current;
+  }
+
+  return previous[right.length] <= limit;
+}
+
+function compatibleShippingAddress(left: Pick<OrderRow, ShippingField>, right: Pick<OrderRow, ShippingField>) {
+  if (!hasShippingAddress(left) || !hasShippingAddress(right)) return false;
+
+  const sameDestination =
+    normalizedShippingPart(left.address2) === normalizedShippingPart(right.address2) &&
+    normalizedShippingPart(left.city) === normalizedShippingPart(right.city) &&
+    normalizedShippingPart(left.state) === normalizedShippingPart(right.state) &&
+    normalizedShippingPart(left.zipcode) === normalizedShippingPart(right.zipcode);
+  if (!sameDestination) return false;
+
+  const leftAddress = normalizedShippingPart(left.address);
+  const rightAddress = normalizedShippingPart(right.address);
+  return leftAddress === rightAddress || editDistanceWithin(leftAddress, rightAddress, 1);
+}
+
 function hasShippingAddress(order: Pick<OrderRow, "address" | "city" | "state" | "zipcode">) {
   return Boolean(order.address && order.city && order.state && order.zipcode);
 }
@@ -301,6 +344,7 @@ function addressLabel(order: OrderRow | CustomerRow | ProcessOrderRow) {
 
 function processOrderGroups(orders: OrderRow[]) {
   const groups = new Map<string, ProcessOrderRow>();
+  const processGroups: ProcessOrderRow[] = [];
   const bestShippingByOrderGroup = new Map<string, OrderRow>();
   const shippingByCustomer = new Map<string, Map<string, OrderRow>>();
 
@@ -336,6 +380,7 @@ function processOrderGroups(orders: OrderRow[]) {
       const key = `${customerKey(order)}|${shippingAddressKey(effectiveOrder)}`;
       const existing =
         groups.get(key) ||
+        processGroups.find((group) => group.customerId === order.customerId && compatibleShippingAddress(group, effectiveOrder)) ||
         ({
           ...effectiveOrder,
           groupKey: key,
@@ -344,6 +389,9 @@ function processOrderGroups(orders: OrderRow[]) {
           items: [],
           dateText: "",
         } satisfies ProcessOrderRow);
+      if (!groups.has(existing.groupKey)) {
+        processGroups.push(existing);
+      }
       fillMissingShipping(existing, effectiveOrder);
       existing.orderGroups.add(order.orderGroup);
       existing.orderIds.push(order.orderId);
@@ -357,10 +405,10 @@ function processOrderGroups(orders: OrderRow[]) {
       existing.dateText = Array.from(new Set([...existing.dateText.split(", ").filter(Boolean), displayDate(order.orderDate)]))
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
         .join(", ");
-      groups.set(key, existing);
+      groups.set(existing.groupKey, existing);
     });
 
-  return Array.from(groups.values()).sort((a, b) => {
+  return processGroups.sort((a, b) => {
     const dateCompare = a.orderDate.localeCompare(b.orderDate);
     return dateCompare || a.customerName.localeCompare(b.customerName);
   });
