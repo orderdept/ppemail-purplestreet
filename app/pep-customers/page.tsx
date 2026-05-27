@@ -145,6 +145,10 @@ function parseMoney(value: unknown) {
   return raw.includes("(") && raw.includes(")") ? -parsed : parsed;
 }
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function formatDate(value: unknown) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value.toISOString().slice(0, 10);
@@ -423,8 +427,8 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
       const quantity = bundleQty > 1 && columnQty <= 1 ? bundleQty : columnQty || bundleQty || 0;
       const sku = cleanText(cell(row, columns, "sku"));
       const savedPrice = priceMap.get(skuKey(sku));
-      const cost = savedPrice ? savedPrice.cost * quantity : 0;
-      const price = savedPrice ? savedPrice.price * quantity : 0;
+      const cost = savedPrice ? savedPrice.cost : 0;
+      const price = savedPrice ? savedPrice.price : 0;
       if (savedPrice) {
         autoPriced += 1;
       } else if (sku) {
@@ -442,7 +446,7 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
         qty: quantity,
         cost,
         price,
-        profit: price - cost,
+        profit: roundMoney(price - cost),
         customerName,
         firstName: firstNameFrom(customerName),
         lastName: lastNameFrom(customerName),
@@ -1249,7 +1253,7 @@ export default function PepCustomersPage() {
               <div>
                 <p className="section-step">SKU Pricing</p>
                 <h2>Saved Cost And Price</h2>
-                <p>Saved values are unit amounts for new imports. Existing order lines keep their saved cost and price unless edited on Orders.</p>
+                <p>Saved values are full line amounts for the SKU. Quantity is not multiplied into cost or price during import.</p>
               </div>
             </div>
             <div className="host-form-grid sku-price-form">

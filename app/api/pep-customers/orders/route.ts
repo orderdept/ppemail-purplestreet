@@ -17,6 +17,10 @@ function cleanMoney(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function cleanOrder(value: unknown): PepCustomerOrder | null {
   const row = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
   if (!row) return null;
@@ -41,7 +45,7 @@ function cleanOrder(value: unknown): PepCustomerOrder | null {
     qty: cleanMoney(row.qty),
     cost,
     price,
-    profit: price - cost,
+    profit: roundMoney(price - cost),
     customerName,
     firstName: cleanText(row.firstName),
     lastName: cleanText(row.lastName),
