@@ -553,6 +553,16 @@ export default function PepCustomersPage() {
     if (!processSort) return processOrders;
     return [...processOrders].sort((a, b) => compareProcessOrders(a, b, processSort.key, processSort.direction));
   }, [processOrders, processSort]);
+  const pendingProductTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    processOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        const label = productLabel(item.productName || item.sku);
+        totals.set(label, (totals.get(label) || 0) + (item.qty || 0));
+      });
+    });
+    return Array.from(totals.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+  }, [processOrders]);
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
   const profit = orders.reduce((sum, order) => sum + order.profit, 0);
@@ -823,19 +833,29 @@ export default function PepCustomersPage() {
         <div className="stat-card"><span>Export</span><strong>{exportCustomers.length}</strong></div>
       </section>
 
-      <div className="tab-row" role="tablist" aria-label="Pep Customers sections">
-        {tabs.map((tab) => (
-          <button
-            aria-selected={activeTab === tab.key}
-            className={`tab-button${activeTab === tab.key ? " active" : ""}`}
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            role="tab"
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="tab-summary-row">
+        <div className="tab-row" role="tablist" aria-label="Pep Customers sections">
+          {tabs.map((tab) => (
+            <button
+              aria-selected={activeTab === tab.key}
+              className={`tab-button${activeTab === tab.key ? " active" : ""}`}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              role="tab"
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="pending-stock-summary" aria-label="Pending product totals">
+          <span>Pending stock</span>
+          {pendingProductTotals.length ? (
+            pendingProductTotals.map(([label, qty]) => <strong key={label}>{qty} x {label}</strong>)
+          ) : (
+            <strong>All processed</strong>
+          )}
+        </div>
       </div>
 
       {activeTab === "customers" ? (
