@@ -1113,7 +1113,7 @@ export default function PepCustomersPage() {
               <p>Copy the order label, then enter tracking to mark the order as processed.</p>
             </div>
           </div>
-          <div className="table-wrap">
+          <div className="table-wrap process-orders-table-wrap">
             <table className="data-table ops-table">
               <thead>
                 <tr>
@@ -1138,7 +1138,17 @@ export default function PepCustomersPage() {
                       <td>{addressText(order)}</td>
                       <td>
                         <div className="table-action-row">
-                          <button className="action-button ghost" type="button" onClick={() => void copyProcessOrder(order)}>Copy Order</button>
+                          <span className="copy-preview-wrap">
+                            <button
+                              className="action-button ghost"
+                              title={addressLabel(order)}
+                              type="button"
+                              onClick={() => void copyProcessOrder(order)}
+                            >
+                              Copy Order
+                            </button>
+                            <span className="copy-preview-tooltip" role="tooltip">{addressLabel(order)}</span>
+                          </span>
                           <button className="action-button" type="button" onClick={() => openTrackingDialog(order)}>Tracking</button>
                         </div>
                       </td>

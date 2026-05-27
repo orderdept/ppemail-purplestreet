@@ -864,6 +864,38 @@ h1 {
   gap: 8px;
 }
 
+.copy-preview-wrap {
+  display: inline-flex;
+  position: relative;
+}
+
+.copy-preview-tooltip {
+  background: #211628;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 18px 48px rgba(36, 22, 41, 0.24);
+  color: #fbf5ff;
+  display: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.45;
+  max-width: min(360px, 70vw);
+  min-width: 260px;
+  padding: 12px 14px;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  text-align: left;
+  top: calc(100% + 8px);
+  white-space: pre-wrap;
+  z-index: 30;
+}
+
+.copy-preview-wrap:focus-within .copy-preview-tooltip,
+.copy-preview-wrap:hover .copy-preview-tooltip {
+  display: block;
+}
+
 .tab-summary-row {
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -1052,6 +1084,10 @@ h1 {
 
 .table-wrap {
   overflow: auto;
+}
+
+.process-orders-table-wrap {
+  overflow: visible;
 }
 
 .data-table {
@@ -1253,6 +1289,10 @@ h1 {
 
   .topbar-actions {
     margin-left: 0;
+  }
+
+  .process-orders-table-wrap {
+    overflow: auto;
   }
 
   .module-scroll {
