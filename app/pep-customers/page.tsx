@@ -489,7 +489,7 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
         orderDate: formatDate(cell(row, columns, "orderDate")),
         sku,
         productName,
-        dose: cleanText(optionalCell(row, optional, "dose")) || doseFromProductName(rawProductName),
+        dose: doseFromProductName(rawProductName) || cleanText(optionalCell(row, optional, "dose")),
         brand: glpBrand(cell(row, columns, "brand")) || productName,
         qty: quantity,
         cost,
