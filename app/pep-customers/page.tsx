@@ -201,11 +201,22 @@ function doseFromProductName(value: unknown) {
   return cleanText(bundleDose || anyDose).replace(/\s+/g, "");
 }
 
+function qtyFromTotalDose(text: string) {
+  const totalMg = Number(text.match(/\b(\d+(?:\.\d+)?)\s*mg\s+total\b/i)?.[1]);
+  const doseMg = Number(
+    text.match(/\((\d+(?:\.\d+)?)\s*mg\)/i)?.[1] ||
+      text.match(/\b(\d+(?:\.\d+)?)\s*mg\s*(?:-|$)/i)?.[1]
+  );
+  if (!Number.isFinite(totalMg) || !Number.isFinite(doseMg) || doseMg <= 0) return 0;
+  const quantity = totalMg / doseMg;
+  return Number.isInteger(quantity) && quantity > 1 ? quantity : 0;
+}
+
 function qtyFromProductName(value: unknown) {
   const text = cleanText(value);
   const bundleQty = text.match(/\b(\d+)\s*x\s*\d+(?:\.\d+)?\s*mg\b/i)?.[1];
-  const countQty = text.match(/\b(\d+)\s*(?:count|ct)\b/i)?.[1];
-  return Number(bundleQty || countQty || 0);
+  const countQty = text.match(/\b(\d+)\s*-?\s*(?:count|ct|pack|pk|vials?)\b/i)?.[1];
+  return Number(bundleQty || countQty || qtyFromTotalDose(text) || 0);
 }
 
 function dateSearchText(value: string) {
