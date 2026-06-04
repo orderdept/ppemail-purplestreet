@@ -202,8 +202,10 @@ function doseFromProductName(value: unknown) {
 }
 
 function qtyFromProductName(value: unknown) {
-  const bundleQty = cleanText(value).match(/\b(\d+)\s*x\s*\d+(?:\.\d+)?\s*mg\b/i)?.[1];
-  return bundleQty ? Number(bundleQty) : 0;
+  const text = cleanText(value);
+  const bundleQty = text.match(/\b(\d+)\s*x\s*\d+(?:\.\d+)?\s*mg\b/i)?.[1];
+  const countQty = text.match(/\b(\d+)\s*(?:count|ct)\b/i)?.[1];
+  return Number(bundleQty || countQty || 0);
 }
 
 function dateSearchText(value: string) {
