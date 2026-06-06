@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 type OrderRow = {
@@ -610,6 +610,8 @@ export default function PepCustomersPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("customers");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("Loading saved orders...");
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
@@ -627,6 +629,7 @@ export default function PepCustomersPage() {
   const [isSavingSku, setIsSavingSku] = useState(false);
   const [editingPricing, setEditingPricing] = useState<{ orderId: string; field: "cost" | "price"; value: string } | null>(null);
   const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const brands = useMemo(() => Array.from(new Set(orders.map((order) => order.brand).filter(Boolean))).sort(), [orders]);
   const filteredOrders = useMemo(
@@ -757,6 +760,7 @@ export default function PepCustomersPage() {
 
   async function handleFile(file: File) {
     setStatus("Reading order file...");
+    setIsImporting(true);
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -781,8 +785,12 @@ export default function PepCustomersPage() {
         ? ` Missing SKU pricing: ${imported.missingPriceSkus.slice(0, 6).join(", ")}${imported.missingPriceSkus.length > 6 ? "..." : ""}.`
         : "";
       setStatus(`Saved ${file.name}: ${data.added ?? 0} new order lines and ${data.updated ?? 0} updated lines.${pricingNote}${missingNote}`);
+      setSelectedImportFile(null);
+      if (importInputRef.current) importInputRef.current.value = "";
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not import that order file.");
+    } finally {
+      setIsImporting(false);
     }
   }
 
@@ -1305,7 +1313,26 @@ export default function PepCustomersPage() {
               <h2>Order Spreadsheet</h2>
               <p>Reads the first sheet, ignores spreadsheet cost and price columns, and prices each line from saved SKU pricing.</p>
             </div>
-            <input className="plain-file-input" type="file" accept=".xlsx,.xls" onChange={(event) => event.target.files?.[0] && void handleFile(event.target.files[0])} />
+            <div className="import-file-actions">
+              <input
+                ref={importInputRef}
+                className="plain-file-input"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(event) => setSelectedImportFile(event.target.files?.[0] || null)}
+              />
+              <button
+                className="action-button"
+                disabled={!selectedImportFile || isImporting}
+                type="button"
+                onClick={() => selectedImportFile && void handleFile(selectedImportFile)}
+              >
+                {isImporting ? "Importing..." : "Import Orders"}
+              </button>
+              <small className="inline-status">
+                {selectedImportFile ? selectedImportFile.name : "Choose an order spreadsheet first."}
+              </small>
+            </div>
           </div>
           <div className="pricing-manager top-gap">
             <div className="section-head compact-section-head">

@@ -777,6 +777,22 @@ h1 {
   padding: 0;
 }
 
+.import-file-actions {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  max-width: 460px;
+}
+
+.import-file-actions .inline-status {
+  flex-basis: 100%;
+  margin: 0;
+  max-width: none;
+  text-align: right;
+}
+
 .inline-input {
   flex: 1 1 220px;
   min-height: 42px;
