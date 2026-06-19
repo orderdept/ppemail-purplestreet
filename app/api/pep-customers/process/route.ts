@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import {
+  clearConvexPepCustomerOrdersProcessed,
   getConvexPepCustomerOrders,
   markConvexPepCustomerOrdersProcessed,
 } from "../../../../lib/convex-server";
@@ -16,10 +17,30 @@ export async function POST(request: Request) {
     const orderIds: string[] = Array.isArray(body?.orderIds)
       ? Array.from(new Set(body.orderIds.map(cleanText).filter(Boolean)))
       : [];
+    const action = cleanText(body?.action);
     const trackingNumber = cleanText(body?.trackingNumber);
 
     if (!orderIds.length) {
       return NextResponse.json({ error: "Choose an order to process first." }, { status: 400 });
+    }
+
+    if (action === "unship") {
+      const result = await clearConvexPepCustomerOrdersProcessed(orderIds);
+      const updated = result?.updated ?? 0;
+
+      if (!updated) {
+        return NextResponse.json({ error: "No matching order was found to unship." }, { status: 404 });
+      }
+
+      const orders = await getConvexPepCustomerOrders();
+
+      revalidatePath("/pep-customers");
+
+      return NextResponse.json({
+        ok: true,
+        updated,
+        orders: orders ?? [],
+      });
     }
 
     if (!trackingNumber) {

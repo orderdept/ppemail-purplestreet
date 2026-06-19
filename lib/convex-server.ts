@@ -368,6 +368,17 @@ export async function markConvexPepCustomerOrdersProcessed(orderIds: string[], t
   });
 }
 
+export async function clearConvexPepCustomerOrdersProcessed(orderIds: string[]) {
+  const client = getConvexClient();
+  if (!client) {
+    throw new Error("Convex is not configured.");
+  }
+  return await client.mutation(api.pepCustomers.clearProcessed, {
+    moduleKey: pepCustomersModuleKey,
+    orderIds,
+  });
+}
+
 export async function upsertConvexCampaignDraft(draft: CampaignDraft) {
   const client = getConvexClient();
   if (!client) {

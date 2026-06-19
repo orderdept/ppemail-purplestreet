@@ -1243,6 +1243,28 @@ h1 {
   width: min(100%, 460px);
 }
 
+.unship-panel {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.checkbox-row {
+  align-items: flex-start;
+  color: var(--text);
+  display: flex;
+  font-weight: 700;
+  gap: 10px;
+  line-height: 1.35;
+}
+
+.checkbox-row input {
+  margin-top: 2px;
+}
+
 .activity-list {
   color: var(--muted);
   margin: 0;

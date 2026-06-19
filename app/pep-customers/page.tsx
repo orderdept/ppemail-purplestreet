@@ -622,6 +622,7 @@ export default function PepCustomersPage() {
   const [copyStatus, setCopyStatus] = useState("");
   const [trackingOrder, setTrackingOrder] = useState<ProcessOrderRow | null>(null);
   const [trackingNumber, setTrackingNumber] = useState("");
+  const [unshipConfirmed, setUnshipConfirmed] = useState(false);
   const [isSavingTracking, setIsSavingTracking] = useState(false);
   const [processStatus, setProcessStatus] = useState("");
   const [skuForm, setSkuForm] = useState({ sku: "", cost: "", price: "" });
@@ -972,6 +973,7 @@ export default function PepCustomersPage() {
   function openTrackingDialog(order: ProcessOrderRow) {
     setTrackingOrder(order);
     setTrackingNumber(order.trackingNumber || "");
+    setUnshipConfirmed(false);
     setProcessStatus("");
   }
 
@@ -1030,6 +1032,33 @@ export default function PepCustomersPage() {
       setCopyStatus(message);
     } catch (error) {
       setProcessStatus(error instanceof Error ? error.message : "Could not process that order.");
+    } finally {
+      setIsSavingTracking(false);
+    }
+  }
+
+  async function submitUnshipOrder() {
+    if (!trackingOrder || !trackingOrder.processedAt || !unshipConfirmed) return;
+
+    setProcessStatus("Moving order back to Process Orders...");
+    setIsSavingTracking(true);
+    try {
+      const response = await fetch("/api/pep-customers/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unship", orderIds: trackingOrder.orderIds }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Could not unship that order.");
+      setOrders(Array.isArray(data.orders) ? data.orders : orders);
+      setTrackingOrder(null);
+      setTrackingNumber("");
+      setUnshipConfirmed(false);
+      const message = `Moved ${Array.from(trackingOrder.orderGroups).sort().join(", ")} back to Process Orders.`;
+      setProcessStatus(message);
+      setCopyStatus(message);
+    } catch (error) {
+      setProcessStatus(error instanceof Error ? error.message : "Could not unship that order.");
     } finally {
       setIsSavingTracking(false);
     }
@@ -1481,11 +1510,35 @@ export default function PepCustomersPage() {
                 value={trackingNumber}
               />
             </label>
+            {trackingOrder.processedAt ? (
+              <div className="unship-panel">
+                <label className="checkbox-row">
+                  <input
+                    checked={unshipConfirmed}
+                    disabled={isSavingTracking}
+                    onChange={(event) => setUnshipConfirmed(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>Unship this order and remove its tracking number.</span>
+                </label>
+                <p className="quiet-note">This moves the order back to Process Orders so it can be processed again later.</p>
+              </div>
+            ) : null}
             {processStatus ? <small className="inline-status">{processStatus}</small> : null}
             <div className="page-top-actions">
               <button className="action-button" disabled={isSavingTracking} type="button" onClick={() => void submitTrackingNumber()}>
                 {isSavingTracking ? "Saving..." : "Save tracking"}
               </button>
+              {trackingOrder.processedAt ? (
+                <button
+                  className="action-button ghost danger-action"
+                  disabled={isSavingTracking || !unshipConfirmed}
+                  type="button"
+                  onClick={() => void submitUnshipOrder()}
+                >
+                  Unship order
+                </button>
+              ) : null}
               <button className="action-button ghost" disabled={isSavingTracking} type="button" onClick={() => setTrackingOrder(null)}>Cancel</button>
             </div>
           </div>
