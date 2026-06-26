@@ -104,6 +104,7 @@ type ColumnKey = keyof typeof requiredColumns;
 type OptionalColumnKey = keyof typeof optionalColumns;
 type TabKey = "customers" | "orders" | "process" | "import" | "export";
 type SortDirection = "asc" | "desc";
+type CustomerSortKey = "customerName";
 type ProcessSortKey = "orderDate" | "orderGroup";
 type OrderSortKey =
   | "orderId"
@@ -319,6 +320,14 @@ function compareProcessOrders(a: ProcessOrderRow, b: ProcessOrderRow, key: Proce
   const multiplier = direction === "asc" ? 1 : -1;
   if (typeof aValue === "number" && typeof bValue === "number") return (aValue - bValue) * multiplier;
   return String(aValue).localeCompare(String(bValue), undefined, { numeric: true }) * multiplier;
+}
+
+function compareCustomers(a: CustomerRow, b: CustomerRow, key: CustomerSortKey, direction: SortDirection) {
+  const multiplier = direction === "asc" ? 1 : -1;
+  if (key === "customerName") {
+    return cleanText(a.customerName).toLowerCase().localeCompare(cleanText(b.customerName).toLowerCase(), undefined, { numeric: true }) * multiplier;
+  }
+  return 0;
 }
 
 function customerKey(order: OrderRow) {
@@ -615,6 +624,7 @@ export default function PepCustomersPage() {
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("");
   const [date, setDate] = useState("");
+  const [customerSort, setCustomerSort] = useState<{ key: CustomerSortKey; direction: SortDirection } | null>(null);
   const [orderSort, setOrderSort] = useState<{ key: OrderSortKey; direction: SortDirection } | null>(null);
   const [processSort, setProcessSort] = useState<{ key: ProcessSortKey; direction: SortDirection } | null>(null);
   const [exportStartOrderId, setExportStartOrderId] = useState("");
@@ -654,7 +664,11 @@ export default function PepCustomersPage() {
     if (!orderSort) return filteredOrders;
     return [...filteredOrders].sort((a, b) => compareOrders(a, b, orderSort.key, orderSort.direction));
   }, [filteredOrders, orderSort]);
-  const customers = useMemo(() => customerGroups(filteredOrders), [filteredOrders]);
+  const customers = useMemo(() => {
+    const groupedCustomers = customerGroups(filteredOrders);
+    if (!customerSort) return groupedCustomers;
+    return [...groupedCustomers].sort((a, b) => compareCustomers(a, b, customerSort.key, customerSort.direction));
+  }, [customerSort, filteredOrders]);
   const processOrders = useMemo(() => processOrderGroups(orders), [orders]);
   const visibleProcessOrders = useMemo(() => {
     if (!processSort) return processOrders;
@@ -1071,6 +1085,23 @@ export default function PepCustomersPage() {
     });
   }
 
+  function toggleCustomerSort(key: CustomerSortKey) {
+    setCustomerSort((current) => {
+      if (!current || current.key !== key) return { key, direction: "asc" };
+      return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+    });
+  }
+
+  function customerSortableHeader(key: CustomerSortKey, label: string) {
+    const active = customerSort?.key === key;
+    return (
+      <button className="sortable-header" onClick={() => toggleCustomerSort(key)} type="button">
+        <span>{label}</span>
+        {active ? <span className="sort-indicator">{customerSort.direction === "asc" ? "Asc" : "Desc"}</span> : null}
+      </button>
+    );
+  }
+
   function sortableHeader(key: OrderSortKey, label: string) {
     const active = orderSort?.key === key;
     return (
@@ -1169,7 +1200,7 @@ export default function PepCustomersPage() {
             <table className="data-table ops-table">
               <thead>
                 <tr>
-                  <th>Customer</th><th>Email</th><th>Customer ID</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Last Order</th>
+                  <th>{customerSortableHeader("customerName", "Customer")}</th><th>Email</th><th>Customer ID</th><th>Orders</th><th>Revenue</th><th>Profit</th><th>Last Order</th>
                 </tr>
               </thead>
               <tbody>
