@@ -132,6 +132,14 @@ function skuKey(value: unknown) {
   return cleanText(value).toUpperCase();
 }
 
+const knownSkuProducts: Record<string, { productName: string; qty: number }> = {
+  "2173": { productName: "Sermorelin", qty: 1 },
+};
+
+function knownSkuProduct(value: unknown) {
+  return knownSkuProducts[skuKey(value)];
+}
+
 function normalizeHeader(value: unknown) {
   return cleanText(value)
     .toLowerCase()
@@ -494,15 +502,16 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
       const customerName = cleanText(cell(row, columns, "customerName"));
       const customerId = cleanText(cell(row, columns, "customerId"));
       if (!orderId || !customerName || !customerId) return null;
+      const sku = cleanText(cell(row, columns, "sku"));
+      const knownProduct = knownSkuProduct(sku);
       const rawProductName =
         cleanText(optionalCell(row, optional, "productName")) ||
         cleanText(optionalCell(row, optional, "ingredient")) ||
         cleanText(cell(row, columns, "brand"));
-      const productName = productLabel(rawProductName) || cleanText(cell(row, columns, "sku"));
+      const productName = knownProduct?.productName || productLabel(rawProductName) || sku;
       const columnQty = Number(cell(row, columns, "qty")) || 0;
       const bundleQty = qtyFromProductName(rawProductName);
-      const quantity = bundleQty > 1 && columnQty <= 1 ? bundleQty : columnQty || bundleQty || 0;
-      const sku = cleanText(cell(row, columns, "sku"));
+      const quantity = bundleQty > 1 && columnQty <= 1 ? bundleQty : columnQty || bundleQty || knownProduct?.qty || 0;
       const savedPrice = priceMap.get(skuKey(sku));
       const cost = savedPrice ? savedPrice.cost : 0;
       const price = savedPrice ? savedPrice.price : 0;
@@ -519,7 +528,7 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
         sku,
         productName,
         dose: doseFromProductName(rawProductName) || cleanText(optionalCell(row, optional, "dose")),
-        brand: glpBrand(cell(row, columns, "brand")) || productName,
+        brand: knownProduct?.productName || glpBrand(cell(row, columns, "brand")) || productName,
         qty: quantity,
         cost,
         price,
