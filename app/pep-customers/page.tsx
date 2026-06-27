@@ -234,6 +234,13 @@ function displayDate(value: string) {
   return `${month}/${day}/${year.slice(2)}`;
 }
 
+function inclusiveDaysSince(startDate: Date) {
+  const today = new Date();
+  const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000) + 1);
+}
+
 function addressText(order: OrderRow) {
   return [order.address, order.address2, order.city, order.state, order.zipcode].filter(Boolean).join(", ");
 }
@@ -687,6 +694,7 @@ export default function PepCustomersPage() {
   const groupedOrderCount = useMemo(() => new Set(orders.map((order) => order.orderGroup)).size, [orders]);
   const revenue = orders.reduce((sum, order) => sum + order.price, 0);
   const profit = orders.reduce((sum, order) => sum + order.profit, 0);
+  const profitPerDay = profit / inclusiveDaysSince(new Date(2026, 4, 12));
   const latestOrderGroup = useMemo(
     () => orders.reduce((latest, order) => Math.max(latest, orderGroupNumber(order.orderGroup) || 0), 0),
     [orders]
@@ -1153,12 +1161,13 @@ export default function PepCustomersPage() {
         </div>
       </div>
 
-      <section className="stat-grid stat-grid-six">
+      <section className="stat-grid stat-grid-seven">
         <div className="stat-card"><span>Orders</span><strong>{groupedOrderCount}</strong></div>
         <div className="stat-card"><span>Customers</span><strong>{customerGroups(orders).length}</strong></div>
         <div className="stat-card"><span>Order Lines</span><strong>{orders.length}</strong></div>
         <div className="stat-card"><span>Revenue</span><strong>{moneyFormatter.format(revenue)}</strong></div>
         <div className="stat-card"><span>Profit</span><strong>{moneyFormatter.format(profit)}</strong></div>
+        <div className="stat-card"><span>Profit per day</span><strong>{moneyFormatter.format(profitPerDay)}</strong></div>
         <div className="stat-card"><span>Export</span><strong>{exportCustomers.length}</strong></div>
       </section>
 

@@ -500,7 +500,7 @@ h1 {
 
 .stat-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 18px;
 }
 
@@ -508,11 +508,15 @@ h1 {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
+.stat-grid-seven {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
 .stat-card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 14px;
 }
 
 .content-grid,
@@ -1280,6 +1284,7 @@ h1 {
   .split-grid,
   .content-grid,
   .stat-grid-six,
+  .stat-grid-seven,
   .workflow-summary-bar,
   .detail-grid,
   .campaign-command-grid {
