@@ -132,8 +132,8 @@ function skuKey(value: unknown) {
   return cleanText(value).toUpperCase();
 }
 
-const knownSkuProducts: Record<string, { productName: string; qty: number }> = {
-  "2173": { productName: "Sermorelin", qty: 1 },
+const knownSkuProducts: Record<string, { productName: string; brand: string; qty: number }> = {
+  "2173": { productName: "Sermorelin", brand: "SERM", qty: 1 },
 };
 
 function knownSkuProduct(value: unknown) {
@@ -528,7 +528,7 @@ function importOrders(rows: unknown[][], skuPrices: SkuPriceRow[]): ImportResult
         sku,
         productName,
         dose: doseFromProductName(rawProductName) || cleanText(optionalCell(row, optional, "dose")),
-        brand: knownProduct?.productName || glpBrand(cell(row, columns, "brand")) || productName,
+        brand: knownProduct?.brand || glpBrand(cell(row, columns, "brand")) || productName,
         qty: quantity,
         cost,
         price,
