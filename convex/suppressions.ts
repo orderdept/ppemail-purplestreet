@@ -97,3 +97,27 @@ export const addForModule = mutation({
     return { added: true, count: existing.length + 1 };
   },
 });
+
+export const removeForModule = mutation({
+  args: {
+    moduleKey: v.string(),
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("suppressions")
+      .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
+      .collect();
+    const matches = existing.filter((row) => row.email === args.email);
+
+    for (const row of matches) {
+      await ctx.db.delete(row._id);
+    }
+
+    return {
+      deleted: matches.length > 0,
+      deletedCount: matches.length,
+      count: existing.length - matches.length,
+    };
+  },
+});

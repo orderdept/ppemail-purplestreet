@@ -1129,10 +1129,14 @@ h1 {
 }
 
 .suppression-match-list li {
+  align-items: center;
   background: var(--panel-soft);
   border: 1px solid var(--line);
   border-radius: 4px;
+  display: flex;
   font-size: 0.92rem;
+  gap: 12px;
+  justify-content: space-between;
   line-height: 1.4;
   padding: 10px 12px;
 }
