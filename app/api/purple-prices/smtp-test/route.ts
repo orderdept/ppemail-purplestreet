@@ -1,29 +1,10 @@
 import { NextResponse } from "next/server";
-
-import { getPurplePricesData } from "../../../../lib/purple-prices-data";
-import { hostedSmtpLoginTest } from "../../../../lib/purple-prices-mail";
-
-export const runtime = "nodejs";
-
-export async function POST(request: Request) {
-  try {
-    const payload = (await request.json().catch(() => ({}))) as {
-      password?: unknown;
-      username?: unknown;
-    };
-    const data = await getPurplePricesData();
-    const result = await hostedSmtpLoginTest(data.draft, {
-      password: typeof payload?.password === "string" ? payload.password : "",
-      username: typeof payload?.username === "string" ? payload.username : "",
-    });
-    return NextResponse.json({
-      ok: true,
-      message: `Hosted SMTP login works for ${result.username} on ${result.host}.`,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Hosted SMTP login failed." },
-      { status: 500 },
-    );
-  }
+function retired() {
+  return NextResponse.json({ error: "This unused operator control has been retired." },
+    { status: 410, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
+export const GET = retired;
+export const HEAD = retired;
+export const POST = retired;
+export const PATCH = retired;
+export const DELETE = retired;

@@ -1,36 +1,10 @@
-import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-
-import { runPurplePricesBounceImport } from "../../../../lib/purple-prices-import";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 120;
-
-export async function POST(request: Request) {
-  try {
-    const payload = (await request.json().catch(() => ({}))) as {
-      campaignSubject?: unknown;
-      password?: unknown;
-      username?: unknown;
-    };
-    const result = await runPurplePricesBounceImport(
-      typeof payload?.campaignSubject === "string" ? payload.campaignSubject : "",
-      {
-        password: typeof payload?.password === "string" ? payload.password : "",
-        username: typeof payload?.username === "string" ? payload.username : "",
-      },
-    );
-    revalidatePath("/");
-    revalidatePath("/purple-prices-email");
-    return NextResponse.json(result);
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Could not import bounce notices.",
-      },
-      { status: 500 },
-    );
-  }
+function retired() {
+  return NextResponse.json({ error: "This unused operator control has been retired." },
+    { status: 410, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
+export const GET = retired;
+export const HEAD = retired;
+export const POST = retired;
+export const PATCH = retired;
+export const DELETE = retired;

@@ -1,72 +1,10 @@
-import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-
-import {
-  clearConvexPepCustomerOrdersProcessed,
-  getConvexPepCustomerOrders,
-  markConvexPepCustomerOrdersProcessed,
-} from "../../../../lib/convex-server";
-
-function cleanText(value: unknown) {
-  return String(value ?? "").trim();
+function retired() {
+  return NextResponse.json({ error: "This unused operator control has been retired." },
+    { status: 410, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const orderIds: string[] = Array.isArray(body?.orderIds)
-      ? Array.from(new Set(body.orderIds.map(cleanText).filter(Boolean)))
-      : [];
-    const action = cleanText(body?.action);
-    const trackingNumber = cleanText(body?.trackingNumber);
-
-    if (!orderIds.length) {
-      return NextResponse.json({ error: "Choose an order to process first." }, { status: 400 });
-    }
-
-    if (action === "unship") {
-      const result = await clearConvexPepCustomerOrdersProcessed(orderIds);
-      const updated = result?.updated ?? 0;
-
-      if (!updated) {
-        return NextResponse.json({ error: "No matching order was found to unship." }, { status: 404 });
-      }
-
-      const orders = await getConvexPepCustomerOrders();
-
-      revalidatePath("/pep-customers");
-
-      return NextResponse.json({
-        ok: true,
-        updated,
-        orders: orders ?? [],
-      });
-    }
-
-    if (!trackingNumber) {
-      return NextResponse.json({ error: "Enter a tracking number first." }, { status: 400 });
-    }
-
-    const result = await markConvexPepCustomerOrdersProcessed(orderIds, trackingNumber);
-    const updated = result?.updated ?? 0;
-
-    if (!updated) {
-      return NextResponse.json({ error: "No matching order was found to mark as processed." }, { status: 404 });
-    }
-
-    const orders = await getConvexPepCustomerOrders();
-
-    revalidatePath("/pep-customers");
-
-    return NextResponse.json({
-      ok: true,
-      updated,
-      orders: orders ?? [],
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not process that order." },
-      { status: 500 },
-    );
-  }
-}
+export const GET = retired;
+export const HEAD = retired;
+export const POST = retired;
+export const PATCH = retired;
+export const DELETE = retired;

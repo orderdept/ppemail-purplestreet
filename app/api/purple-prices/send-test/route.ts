@@ -1,42 +1,10 @@
 import { NextResponse } from "next/server";
-
-import { getPurplePricesData } from "../../../../lib/purple-prices-data";
-import { sendHostedPurplePricesTestEmail } from "../../../../lib/purple-prices-mail";
-
-export const runtime = "nodejs";
-
-export async function POST(request: Request) {
-  try {
-    const payload = (await request.json().catch(() => ({}))) as {
-      password?: unknown;
-      username?: unknown;
-    };
-    const data = await getPurplePricesData();
-    if (!data.draft.messageSubject || !data.draft.messageBody) {
-      return NextResponse.json(
-        { error: "Save or load a campaign message first so PS has something to send." },
-        { status: 400 },
-      );
-    }
-
-    const result = await sendHostedPurplePricesTestEmail(data.draft, {
-      subject: data.draft.messageSubject,
-      previewText: data.draft.messagePreviewText,
-      body: data.draft.messageBody,
-      mailingAddress: data.draft.messageMailingAddress,
-    }, {
-      password: typeof payload?.password === "string" ? payload.password : "",
-      username: typeof payload?.username === "string" ? payload.username : "",
-    });
-    return NextResponse.json({
-      ok: true,
-      message: `Sent hosted test to ${result.name} <${result.to}> from ${result.from}.`,
-      templateName: data.draft.draftMessageName,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Hosted test send failed." },
-      { status: 500 },
-    );
-  }
+function retired() {
+  return NextResponse.json({ error: "This unused operator control has been retired." },
+    { status: 410, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
+export const GET = retired;
+export const HEAD = retired;
+export const POST = retired;
+export const PATCH = retired;
+export const DELETE = retired;

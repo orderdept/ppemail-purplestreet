@@ -22,31 +22,6 @@ export default function HomePage() {
           <div className="module-row">
             <div>
               <p className="section-step">Panel</p>
-              <h2>Purple Prices Email</h2>
-            </div>
-            <Link className="action-link" href="/purple-prices-email">
-              Open panel
-            </Link>
-          </div>
-        </article>
-
-        <article className="panel wide">
-          <div className="module-row">
-            <div>
-              <p className="section-step">Panel</p>
-              <h2>Pep Customers</h2>
-              <p>Import peptide order spreadsheets, search customers, copy label addresses, and export selected customer lists.</p>
-            </div>
-            <Link className="action-link" href="/pep-customers">
-              Open panel
-            </Link>
-          </div>
-        </article>
-
-        <article className="panel wide">
-          <div className="module-row">
-            <div>
-              <p className="section-step">Panel</p>
               <h2>BarePlay</h2>
             </div>
             <Link
