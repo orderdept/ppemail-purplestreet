@@ -46,3 +46,10 @@
 - Run the public export guard before every build (included in `prebuild`). Keep operational files out of client imports and public assets.
 - Verify anonymous requests to both former static paths and both API download paths after deployment.
 - The email panel still serializes suppression/draft data to its viewer, and the customer-orders API returns customer records. Full origin authentication is a separate unresolved requirement; Cloudflare Access on the custom hostname alone does not protect direct Vercel URLs.
+
+The unused `/purple-prices-email` and `/pep-customers` panels and orders GET/HEAD
+are retired with data-free HTTP 410 responses. Historical implementation and
+records remain intact. Agent campaign scripts use private local files/direct
+Convex access; Hostcats unsubscribe POST bridge remains available. This narrow
+containment does not add authentication to other legacy mutation APIs, which
+must be assessed separately before any further panel retirement or migration.
