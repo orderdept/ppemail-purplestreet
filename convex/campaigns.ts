@@ -1,9 +1,11 @@
+import { assertActiveModule, moduleIsRetired } from "./retirement";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const listByModule = query({
   args: { moduleKey: v.string() },
   handler: async (ctx, { moduleKey }) => {
+    assertActiveModule(moduleKey);
     return await ctx.db
       .query("campaigns")
       .withIndex("by_module", (q) => q.eq("moduleKey", moduleKey))
@@ -51,6 +53,7 @@ export const recordCampaign = mutation({
     updatedAt: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     return await ctx.db.insert("campaigns", args);
   },
 });

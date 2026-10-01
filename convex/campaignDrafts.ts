@@ -1,3 +1,4 @@
+import { assertActiveModule, moduleIsRetired } from "./retirement";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -36,6 +37,7 @@ const draftShape = {
 export const getByModule = query({
   args: { moduleKey: v.string() },
   handler: async (ctx, { moduleKey }) => {
+    assertActiveModule(moduleKey);
     return await ctx.db
       .query("campaignDrafts")
       .withIndex("by_module", (query) => query.eq("moduleKey", moduleKey))
@@ -46,6 +48,7 @@ export const getByModule = query({
 export const upsertForModule = mutation({
   args: draftShape,
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const existing = await ctx.db
       .query("campaignDrafts")
       .withIndex("by_module", (query) => query.eq("moduleKey", args.moduleKey))

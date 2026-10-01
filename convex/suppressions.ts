@@ -1,10 +1,11 @@
+import { assertActiveModule, moduleIsRetired } from "./retirement";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const listSuppressions = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("suppressions").collect();
+    return (await ctx.db.query("suppressions").collect()).filter(row => !moduleIsRetired(row.moduleKey));
   },
 });
 
@@ -13,6 +14,7 @@ export const listByModule = query({
     moduleKey: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     return await ctx.db
       .query("suppressions")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
@@ -37,6 +39,7 @@ export const replaceForModule = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const existing = await ctx.db
       .query("suppressions")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
@@ -76,6 +79,7 @@ export const addForModule = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const existing = await ctx.db
       .query("suppressions")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
@@ -104,6 +108,7 @@ export const removeForModule = mutation({
     email: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const existing = await ctx.db
       .query("suppressions")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))

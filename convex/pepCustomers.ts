@@ -1,3 +1,4 @@
+import { assertActiveModule, moduleIsRetired } from "./retirement";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -42,6 +43,7 @@ export const listOrders = query({
     moduleKey: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const rows = await ctx.db
       .query("pepCustomerOrders")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
@@ -59,6 +61,7 @@ export const listSkuPrices = query({
     moduleKey: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const rows = await ctx.db
       .query("pepSkuPrices")
       .withIndex("by_module", (q) => q.eq("moduleKey", args.moduleKey))
@@ -74,6 +77,7 @@ export const upsertSkuPrice = mutation({
     item: v.object(skuPriceShape),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const updatedAt = new Date().toISOString();
     const existing = await ctx.db
       .query("pepSkuPrices")
@@ -102,6 +106,7 @@ export const deleteSkuPrice = mutation({
     sku: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const existing = await ctx.db
       .query("pepSkuPrices")
       .withIndex("by_module_sku", (q) => q.eq("moduleKey", args.moduleKey).eq("sku", args.sku))
@@ -121,6 +126,7 @@ export const upsertOrders = mutation({
     orders: v.array(v.object(orderShape)),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const updatedAt = new Date().toISOString();
     let added = 0;
     let updated = 0;
@@ -171,6 +177,7 @@ export const updateOrderPricing = mutation({
     price: v.number(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const existing = await ctx.db
       .query("pepCustomerOrders")
       .withIndex("by_module_order", (q) => q.eq("moduleKey", args.moduleKey).eq("orderId", args.orderId))
@@ -196,6 +203,7 @@ export const markProcessed = mutation({
     trackingNumber: v.string(),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const processedAt = new Date().toISOString();
     let updated = 0;
 
@@ -225,6 +233,7 @@ export const clearProcessed = mutation({
     orderIds: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    assertActiveModule(args.moduleKey);
     const updatedAt = new Date().toISOString();
     let updated = 0;
 
