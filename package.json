@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "sync:purple-prices": "node scripts/sync-local-purple-prices-data.mjs"
+    "sync:purple-prices": "node scripts/sync-local-purple-prices-data.mjs",
+    "prebuild": "node scripts/check-public-contact-exports.mjs"
   },
   "dependencies": {
     "convex": "^1.25.4",

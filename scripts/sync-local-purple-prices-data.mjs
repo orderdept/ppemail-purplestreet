@@ -8,28 +8,12 @@ const targetDataRoot = path.join(
   "data",
   "purple-prices",
 );
-const targetExportRoot = path.join(
-  process.cwd(),
-  "public",
-  "exports",
-  "purple-prices",
-);
-
 const copies = [
   ["suppressions.json", path.join(targetDataRoot, "suppressions.json")],
   ["templates.json", path.join(targetDataRoot, "templates.json")],
-  [
-    "suppressed_addresses.csv",
-    path.join(targetExportRoot, "suppressed-addresses.csv"),
-  ],
-  [
-    "suppressed_addresses.json",
-    path.join(targetExportRoot, "suppressed-addresses.json"),
-  ],
 ];
 
 await mkdir(targetDataRoot, { recursive: true });
-await mkdir(targetExportRoot, { recursive: true });
 
 for (const [filename, targetPath] of copies) {
   await cp(path.join(sourceRoot, filename), targetPath, { force: true });

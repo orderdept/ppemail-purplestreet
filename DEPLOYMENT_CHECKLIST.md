@@ -38,3 +38,11 @@
 - test sends are clean
 - scheduled batches are verified
 - you explicitly approve the switch
+
+## Contact-list containment
+
+- Static contact-list exports are removed; suppression CSV/JSON API downloads return 410 without reading operational data.
+- Local sync copies operational suppression data only into server-side `data/purple-prices`; it must never recreate public exports.
+- Run the public export guard before every build (included in `prebuild`). Keep operational files out of client imports and public assets.
+- Verify anonymous requests to both former static paths and both API download paths after deployment.
+- The email panel still serializes suppression/draft data to its viewer, and the customer-orders API returns customer records. Full origin authentication is a separate unresolved requirement; Cloudflare Access on the custom hostname alone does not protect direct Vercel URLs.

@@ -8,3 +8,5 @@ coverage
 dist
 build
 
+# Contact-list exports must never be served as public assets.
+/public/exports/

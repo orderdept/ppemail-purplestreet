@@ -380,14 +380,7 @@ export function WorkflowTabs({
                 <div className="button-row">
                   <ImportBouncesButton campaignSubject={campaigns[0]?.subject || ""} smtpUsername={draft.smtpUsername} />
                 </div>
-                <div className="button-row">
-                  <a className="action-link" href="/api/purple-prices/suppressions/export.csv">
-                    Download CSV
-                  </a>
-                  <a className="action-link ghost" href="/api/purple-prices/suppressions/export.json">
-                    Download JSON
-                  </a>
-                </div>
+                <p>Contact-list downloads are disabled. Suppression checks remain active.</p>
                 <SuppressionSearch suppressions={suppressions} />
               </article>
             </div>

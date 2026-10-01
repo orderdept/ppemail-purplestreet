@@ -216,10 +216,6 @@ export async function getPurplePricesData() {
     campaigns: liveHistory.length ? liveHistory : fileHistory,
     recentLog,
     recentFailures,
-    suppressionDownloads: {
-      csv: "/exports/purple-prices/suppressed-addresses.csv",
-      json: "/exports/purple-prices/suppressed-addresses.json",
-    },
   };
 }
 
