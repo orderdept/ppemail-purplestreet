@@ -55,3 +55,5 @@ containment does not add authentication to other legacy mutation APIs, which
 must be assessed separately before any further panel retirement or migration.
 
 Unused Purple Prices/Pep Customers panel implementation removed reversibly in Git. Legacy mail/customer mutation routes return data-free410. Signed Hostcats unsubscribe POST bridge remains temporarily until validated private-store cutover; no historical data or deployment removed. BarePlay remains unchanged.
+
+Private Hostcats authority activated: signed unsubscribe page writes private locked ledger + SQLite; agent scripts use existingSSH to private datastore. Old suppressionPOST now retired too. Historical Convex records retained. No real mail sent.
